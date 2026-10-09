@@ -30,4 +30,4 @@
 - 节假日表到期后不再“自信作答”：超过覆盖范围（`2026-12-31`）时面板会提示峰谷判定可能不准。
 - API key 路回传 `is_available=false` 时，面板会注明该余额被平台标记为不可用。
 - 皮肤自定义示例里的 `var(--dsw-radius-sm)` 补上字面量兜底（莱茵生命皮肤并未定义 `--dsw-radius-*`，裸引用会整条失效）。
-- 署名去掉占位符，改为 `dsh-rhine-statusbar contributors`（发布前可换成真实 handle）。
+- 署名去掉占位符，改为 `Woo3aN`。

@@ -176,4 +176,4 @@ node tests/host.test.mjs
 
 ## 许可
 
-MIT。版权署名见 [LICENSE](LICENSE)：`Copyright (c) 2026 dsh-rhine-statusbar contributors`。
+MIT。版权署名见 [LICENSE](LICENSE)：`Copyright (c) 2026 Woo3aN`。

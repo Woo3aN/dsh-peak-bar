@@ -7,9 +7,14 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# The workflow only reads the repository and runs tests.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:

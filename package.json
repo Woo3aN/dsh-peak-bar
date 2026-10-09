@@ -12,7 +12,7 @@
     "statusbar",
     "titlebar"
   ],
-  "author": "dsh-rhine-statusbar contributors",
+  "author": "Woo3aN",
   "license": "MIT",
   "type": "module",
   "main": "./index.js",

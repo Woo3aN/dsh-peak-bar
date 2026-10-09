@@ -176,4 +176,4 @@ node tests/host.test.mjs
 
 ## License
 
-MIT. The attribution lives in [LICENSE](LICENSE): `Copyright (c) 2026 dsh-rhine-statusbar contributors`.
+MIT. The attribution lives in [LICENSE](LICENSE): `Copyright (c) 2026 Woo3aN`.

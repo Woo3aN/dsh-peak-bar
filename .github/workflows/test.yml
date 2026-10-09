@@ -1,0 +1,35 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: ['20', '22']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Run tests
+        run: npm test
+        env:
+          # The host test drives its own temporary DSH_HOME, but make sure no
+          # real credential or ledger path leaks in from the runner.
+          DSH_HOME: ${{ runner.temp }}/dsh-rhine-ci
+
+      - name: Pack (verifies the published file list)
+        run: npm pack --dry-run

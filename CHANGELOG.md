@@ -19,8 +19,12 @@
 - 动效时长与缓动改用主题的 `--ds-transition-duration` / `--ds-ease-in-out`，并尊重“减少动态效果”。
 - 完整的 zh/en 本地化（倒计时单位与全部失败原因都走词典，不再是硬编码中文）。
 - 插件卡片的 locale 元数据。
-- 包名与仓库名定为 **`dsh-peak-bar`**（原名 `dsh-rhine-statusbar`）：胶囊的颜色早已与特定皮肤解耦、跟随任意皮肤，所以去掉 `rhine`；同时改掉全部内部标识（客户端模块 id、本机路由、CSS 变量与类名前缀、账本文件名、环境变量 `DSH_PEAK_BAR_BALANCE_URL`）。
 - 图标换成中性配色（不再使用莱茵生命皮肤的橙/棕）；README 增补「致谢」一节。
+
+### 变更
+
+- **包名与仓库名改为 `dsh-peak-bar`（原名 `dsh-rhine-statusbar`）——破坏性变更。** 胶囊的颜色早已与特定皮肤解耦、跟随任意皮肤，所以去掉 `rhine`。同时改掉全部内部标识：客户端模块 id、本机路由（`/dsh-peak-bar/spend`、`/dsh-peak-bar/balance`）、CSS 变量与类名前缀（`--dsh-peak-bar-*`、`dshPeakBar*`）、账本文件名（`.dsh-peak-bar.json`）、环境变量（`DSH_PEAK_BAR_BALANCE_URL`）。
+  **升级须知**：`node_modules` 下旧包名目录不再被引用，需删掉 `dsh-rhine-statusbar` 并重新安装一次；账本文件名随之改变，旧的 `.dsh-rhine-statusbar.json` 不会被读取（如需保留「今日已用」历史，手动改名为 `.dsh-peak-bar.json`）。
 
 ### 修复
 

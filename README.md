@@ -24,6 +24,16 @@
 
 三种入口任选一种，装完之后按“重启”一节操作。
 
+### 从 GitHub 克隆
+
+```bash
+git clone https://github.com/Woo3aN/dsh-peak-bar.git
+cd dsh-peak-bar
+npm test          # 可选：三套离线测试，不需要 DSH 运行时
+```
+
+然后按下面的“添加本地目录”，填入克隆下来的目录绝对路径。
+
 ### 桌面端：添加本地目录
 
 插件 → 添加插件 → 填入本目录的绝对路径。
@@ -31,6 +41,7 @@
 ### 桌面端：添加打包后的 tgz
 
 插件 → 添加插件 → 填入打包后 tgz 的绝对路径。
+（自己打包：`npm pack`，产物为 `dsh-peak-bar-<版本>.tgz`。）
 
 ### 命令行
 

@@ -15,6 +15,14 @@
   ],
   "author": "Woo3aN",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Woo3aN/dsh-peak-bar.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Woo3aN/dsh-peak-bar/issues"
+  },
+  "homepage": "https://github.com/Woo3aN/dsh-peak-bar#readme",
   "type": "module",
   "main": "./index.js",
   "icon": "./icon.svg",

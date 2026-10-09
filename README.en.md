@@ -24,6 +24,16 @@ The capsule is `position:absolute` and the seat is `pointer-events:none`; only t
 
 Pick one of the three entry points, then follow “Restart” below.
 
+### Clone from GitHub
+
+```bash
+git clone https://github.com/Woo3aN/dsh-peak-bar.git
+cd dsh-peak-bar
+npm test          # optional: three offline suites, no DSH runtime needed
+```
+
+Then use “add a local directory” below and point it at the cloned folder.
+
 ### Desktop: add a local directory
 
 Plugins → Add plugin → enter the absolute path of this directory.
@@ -31,6 +41,7 @@ Plugins → Add plugin → enter the absolute path of this directory.
 ### Desktop: add a packed tgz
 
 Plugins → Add plugin → enter the absolute path of the packed tgz.
+(Pack it yourself with `npm pack`; the artifact is `dsh-peak-bar-<version>.tgz`.)
 
 ### Command line
 

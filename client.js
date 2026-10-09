@@ -761,28 +761,47 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * The hover text.
+     *
+     * Built from the parts, never from the panel's own heading: the heading is
+     * "峰谷 · 余额", which already names the balance, so prefixing the tooltip with
+     * it read as `峰谷 · 余额: … 余额 ¥20.79` — the same word twice, behind a
+     * half-width colon. The numbers keep their labels and nothing else repeats.
+     *
+     * It holds no per-second value on purpose: a native `title` tooltip is torn
+     * down whenever the attribute is rewritten, so a countdown in here made the
+     * tooltip blink every second. The countdown lives in the visible text.
+     *
+     * @param props - this plugin's injected data.
+     * @param status - the derived display state.
+     * @returns the tooltip and accessible label.
+     */
+    function capsuleTooltip(props, status) {
+      const parts = [status.label, `${props.balanceLabel} ${status.balanceText}`]
+      if (status.spentText !== '') {
+        // A ledger that fell back to this run is called out in one short word
+        // rather than the whole reason, which belongs in the panel.
+        const suffix = status.spentSource === 'run' ? props.spentUnpersisted : ''
+        parts.push(`${props.spentLabel} ${status.spentText}${suffix}`)
+      }
+      // The failure note is the one thing the capsule can only show truncated.
+      if (status.balanceNote !== '') parts.push(status.balanceNote)
+      parts.push(props.clickHint)
+      return parts.join(' · ')
+    }
+
+    /**
      * The caption-strip capsule: the billing window with its countdown, the
      * balance, and today's observed spend. It is a button because it opens the
      * panel below; the seat around it stays transparent to the pointer so the
      * rest of the strip keeps dragging the window.
-     *
-     * The tooltip deliberately holds only values that change at billing-window
-     * or balance cadence: a native `title` tooltip is torn down whenever its
-     * attribute is rewritten, so a per-second countdown in it made the tooltip
-     * blink once a second. The countdown lives in the visible text instead.
      *
      * @param props - the entry's own props plus this plugin's injected data.
      * @returns the seat and its capsule.
      */
     function StatusCapsule(props) {
       const status = useStatus(props)
-      const source = spendSourceText(props, status.spentSource)
-      const title = `${props.titleLabel}: ${status.label} · ${props.balanceLabel} ${status.balanceText}`
-        + (status.spentText === '' ? '' : ` · ${props.spentLabel} ${status.spentText}`)
-        // Only the degraded ledger is called out; the normal case stays quiet.
-        + (status.spentSource === 'run' ? ` (${source})` : '')
-        + (status.balanceNote === '' ? '' : ` · ${status.balanceNote}`)
-        + ` · ${props.clickHint}`
+      const title = capsuleTooltip(props, status)
 
       /**
        * Open this plugin's `main` panel. The `layout` service is read lazily
@@ -916,6 +935,7 @@ window.__ModuleLoader__.load({
         spendSourceLabel: '今日已用来源',
         spendSourceHost: 'Host 账本（跨重启保留）',
         spendSourceRun: '本次运行（Host 账本不可用）',
+        spentUnpersisted: '（未持久化）',
         spentHint: '“今日已用”按余额减少观测累计（充值/赠金不计入）。账本由 Host 写入 $DSH_HOME，跨重启保留；Host 不可用时退回本次运行统计。',
         clickHint: '点击查看详情',
         reasonNoRemote: '账号 Remote 不可用（{detail}）',
@@ -944,6 +964,7 @@ window.__ModuleLoader__.load({
         spendSourceLabel: 'spent today, source',
         spendSourceHost: 'host ledger (survives restarts)',
         spendSourceRun: 'this run (host ledger unavailable)',
+        spentUnpersisted: ' (not persisted)',
         spentHint: '"Spent today" accumulates the drops between balance readings (top-ups and granted credit are not counted). The ledger lives in $DSH_HOME, written by the Host half, so it survives restarts; when the Host is unavailable the capsule falls back to counting this run only.',
         clickHint: 'click for details',
         reasonNoRemote: 'account Remote unavailable ({detail})',
@@ -1078,6 +1099,7 @@ window.__ModuleLoader__.load({
         spendSourceLabel: t('spendSourceLabel'),
         spendSourceHost: t('spendSourceHost'),
         spendSourceRun: t('spendSourceRun'),
+        spentUnpersisted: t('spentUnpersisted'),
         spentHint: t('spentHint'),
         clickHint: t('clickHint'),
         countdownFormats: { long: t('countdownLong'), short: t('countdownShort') },

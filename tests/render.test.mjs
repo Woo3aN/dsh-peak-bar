@@ -306,19 +306,31 @@ for (const meta of balanceCalls) {
  * The capsule is the only entry point left: activating it must select this
  * plugin's `main` key through the shell's layout service, so a click is
  * exercised the way React would fire it.
+ *
+ * `root` is the hook-identity prefix, shared with `renderEntry`: passing the same
+ * root as an earlier render of the same entry reads that mount's state instead of
+ * starting a fresh one, which is what lets the tooltip be inspected after the
+ * balance and the ledger have settled.
  */
-function findButton(node, data) {
+function findButton(node, data, root = 'entry') {
   if (node === null || node === undefined || typeof node !== 'object') return null
   if (Array.isArray(node)) {
     for (const child of node) {
-      const found = findButton(child, data)
+      const found = findButton(child, data, root)
       if (found !== null) return found
     }
     return null
   }
-  if (typeof node.type === 'function') return findButton(node.type({ ...node.props, ...data }), data)
+  if (typeof node.type === 'function') {
+    const previous = currentIdentity
+    currentIdentity = root
+    hookSeq = 0
+    const rendered = node.type({ ...node.props, ...data })
+    currentIdentity = previous
+    return findButton(rendered, data, root)
+  }
   if (node.type === 'button') return node
-  return findButton(node.children ?? [], data)
+  return findButton(node.children ?? [], data, root)
 }
 
 const opened = []
@@ -378,6 +390,37 @@ const spendText = renderEntry(spendCapsule, spendInjected, 'spend')
 assert.match(spendText, /¥2\.00/, 'a balance drop shows as spend, unsigned and at two decimals')
 assert.match(spendText, /¥13\.00/, 'the balance itself follows the latest reading')
 assert.equal(spendText.includes('-¥'), false, 'the spend readout carries no minus sign')
+
+/**
+ * The hover text names each figure once and never repeats the panel's heading:
+ * prefixing it with "峰谷 · 余额" produced `峰谷 · 余额: … 余额 ¥20.79`, the same
+ * word twice behind a half-width colon. A ledger that fell back to this run is
+ * called out in one short word instead of the whole reason, which the panel
+ * carries.
+ */
+const spendButton = findButton({ type: spendCapsule.component, props: {}, children: [] }, spendInjected, 'spend')
+assert.equal(/zh:label/.test(spendButton.props.title), false, 'the tooltip does not repeat the panel heading')
+assert.equal(
+  (spendButton.props.title.match(/zh:balance /g) ?? []).length,
+  1,
+  'the tooltip names the balance once',
+)
+assert.equal(
+  (spendButton.props.title.match(/zh:spent /g) ?? []).length,
+  1,
+  'the tooltip names the spend once',
+)
+assert.match(
+  spendButton.props.title,
+  /zh:spent ¥2\.00zh:spentUnpersisted/,
+  'a run-only ledger is marked unpersisted in the tooltip',
+)
+assert.match(spendButton.props.title, /zh:clickHint$/, 'the tooltip ends with what a click does')
+assert.equal(
+  spendButton.props.title.includes('zh:countdownShort') || spendButton.props.title.includes('zh:countdownLong'),
+  false,
+  'the tooltip holds no per-second value',
+)
 // Both numbers are labelled, so neither reads as an unlabelled figure.
 assert.match(spendText, /zh:balance.*¥13\.00/, 'the balance is labelled')
 assert.match(spendText, /zh:spent.*¥2\.00/, 'the spend is labelled')

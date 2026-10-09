@@ -671,9 +671,9 @@ assert.ok(
   'a failed read retries sooner than the normal interval',
 )
 
-tickClock(31000)
+tickClock(121000)
 const afterGrace = renderEntry(flakyCapsule, flakyInjected, 'flaky')
-assert.match(afterGrace, /zh:stale/, 'a failure that lasts is marked stale, in two words')
+assert.match(afterGrace, /zh:stale/, 'a failure that lasts past the grace is marked stale, in two words')
 assert.equal(/zh:reasonCallFailed/.test(afterGrace), false, 'the capsule still does not carry the reason')
 const flakyPanel = registrations[registrations.length - 2]
 const flakyPanelInjected = flakyPanel.options.inject()
@@ -785,13 +785,49 @@ assert.match(
 )
 
 /**
+ * A missing API key is a configuration fact, not a failure of that path, so it
+ * gets a short phrase rather than an error with a reason code — the long form made
+ * the note read like something had gone wrong.
+ */
+globalThis.fetch = async () => ({
+  ok: true,
+  status: 200,
+  json: async () => ({ ok: false, reason: 'no-key' }),
+})
+try {
+  const noKeyCtx = makeCtx({ inject: () => {}, remote: undefined })
+  module.apply(noKeyCtx)
+  const noKeyPanel = registrations[registrations.length - 2]
+  const noKeyInjected = noKeyPanel.options.inject()
+  renderEntry(noKeyPanel, noKeyInjected, 'no-key')
+  await flush()
+  const noKeyText = renderEntry(noKeyPanel, noKeyInjected, 'no-key')
+  assert.match(noKeyText, /zh:keyMissing/, 'a missing API key reads as configuration, not as an error')
+  assert.equal(/zh:keyFailed/.test(noKeyText), false, 'and carries no reason code')
+} finally {
+  delete globalThis.fetch
+}
+
+/**
  * The holiday table has an expiry, and the plugin must say so rather than keep
  * answering confidently with a table that no longer knows anything.
  */
-const { isHolidayTableStale, holidayTableLast } = module.testing
+const { isHolidayTableStale, holidayTableLast, retryDelayFor, failureGraceMs } = module.testing
 assert.equal(holidayTableLast, '2026-12-31', 'the covered range is stated in one place')
 assert.equal(isHolidayTableStale(holidayTableLast), false, 'the last covered day is still covered')
 assert.equal(isHolidayTableStale('2027-01-01'), true, 'the day after it is not')
+
+/**
+ * Retrying must not turn into hammering: the first retry is quick so a blip is
+ * repaired at once, and a long outage backs off. The grace is what keeps the
+ * platform's habit of reporting a transient failure as `status: failed` off the
+ * capsule, so it is measured in minutes, not seconds.
+ */
+assert.equal(retryDelayFor(0, 0), 15000, 'the first retry after a failure is quick')
+assert.equal(retryDelayFor(1000, 1000 + 30000), 15000, 'still quick inside the first minute')
+assert.equal(retryDelayFor(1000, 1000 + 90000), 30000, 'a spent minute backs off')
+assert.equal(retryDelayFor(1000, 1000 + 600000), 60000, 'and a long outage settles at the normal pace')
+assert.equal(failureGraceMs, 120000, 'a blip is tolerated for two minutes before anything is shown')
 
 /**
  * Style invariants: the sheet must be well formed, must carry the caption-strip

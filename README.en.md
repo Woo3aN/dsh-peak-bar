@@ -15,9 +15,10 @@ The capsule shows whether the current window is peak or off-peak, the countdown 
 A failed read is never silent:
 
 - **Before any value has ever been read**, the capsule writes the reason on itself at once (“账号 Remote 不可用”, “账号未就绪（status=…）”) — a bare `--` needs its explanation.
-- **Once a value is on screen**, the last number stays and only a failure that **lasts past 30 seconds** is marked, in two words (“余额未刷新” / “balance not refreshed”). The platform reports a transient blip as `status=failed` too, so the long reason no longer flashes in and out. The full reason is always in the details panel.
+- **Once a value is on screen**, the last number stays and only a failure that **lasts past two minutes** is marked, in two words (“余额未刷新” / “balance not refreshed”). The platform reports a transient blip as `status=failed` too, and those blips come back all day, which is why the grace is measured in minutes. The full reason is always in the details panel.
+- A missing API key reads as the short phrase “no API key configured”: a configuration fact, not an error dressed up with a reason code.
 
-While a read is failing the plugin retries every **15 seconds** instead of the normal 60, and retries at once when the browser reports the network back (`online`) or the window becomes visible again — so a dropped connection repairs itself within seconds and the mark disappears on its own.
+While reads are failing the retry backs off — **15s, then 30s, then 60s** — so a short blip is repaired at once without knocking on the platform all day; when the browser reports the network back (`online`) or the window becomes visible again the plugin retries at once, so a real outage still repairs itself within seconds.
 
 The capsule sits in the middle of the window title bar, on the same row as the minimize and close buttons on Windows as well.
 

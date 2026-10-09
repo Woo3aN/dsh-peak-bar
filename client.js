@@ -58,19 +58,22 @@ window.__ModuleLoader__.load({
     /** Balance re-read interval; the account read itself is cached for 25s. */
     const BALANCE_REFRESH_MS = 60000
     /**
-     * Re-read interval used while the last read failed. A dropped connection used
-     * to leave the failure on screen for up to a minute; the account read is
-     * cached for 25s, so trying sooner than this costs nothing.
+     * Re-read intervals used while reads are failing: the platform reports a
+     * transient failure as `status: "failed"`, and retrying every 15s forever only
+     * adds pressure. The first retry is quick, then it backs off, and a success
+     * returns to the normal interval. Coming back online or returning to the window
+     * still reads at once, which is what makes a real outage recover fast.
      */
-    const BALANCE_RETRY_MS = 15000
+    const BALANCE_RETRY_MS = [15000, 30000, 60000]
     /**
-     * How long a failing read is tolerated before it is written anywhere. A
-     * transient failure is reported by the platform as `status: "failed"`, and
-     * showing the reason for one such blip made it flash on and off; the mature
-     * balance widgets keep the last value and mark it stale instead of printing the
-     * error, which is what this delay buys.
+     * How long a failing read is tolerated before it is written anywhere. This is
+     * measured from the first failure in the current run, and the reason it is
+     * minutes rather than seconds is that the platform reports a blip as
+     * `status: "failed"` too: a short grace still let the mark appear and disappear
+     * all day. The last known amount stays on screen, and the panel always carries
+     * the full reason for anyone who looks.
      */
-    const FAILURE_GRACE_MS = 30000
+    const FAILURE_GRACE_MS = 120000
     /** One-second clock is enough: the capsule shows mm:ss. */
     const CLOCK_MS = 1000
 
@@ -553,6 +556,23 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * How long to wait before the next attempt, given when the current run of
+     * failures began: quick at first so a short blip is repaired at once, then
+     * slower, so a long outage does not keep knocking. Coming back online or back to
+     * the window bypasses this and reads immediately.
+     *
+     * @param since - when the current run of failures began, 0 when none.
+     * @param now - the current instant.
+     * @returns the delay in milliseconds.
+     */
+    function retryDelayFor(since, now) {
+      const elapsed = since === 0 ? 0 : now - since
+      if (elapsed < 60000) return BALANCE_RETRY_MS[0]
+      if (elapsed < 300000) return BALANCE_RETRY_MS[1]
+      return BALANCE_RETRY_MS[2]
+    }
+
+    /**
      * Read the balance through the Host half, which holds the API key.
      *
      * This is the path for a user who configured `DEEPSEEK_API_KEY` but never
@@ -579,7 +599,13 @@ window.__ModuleLoader__.load({
       }
       if (!payload || payload.ok !== true) {
         const reason = payload && typeof payload.reason === 'string' ? payload.reason : 'unknown'
-        return { text: null, note: fill(labels.keyFailed, { reason }), total: null }
+        // "No key configured" is a configuration fact, not a failure of this path,
+        // so it gets a short phrase instead of an error with a reason code.
+        return {
+          text: null,
+          note: reason === 'no-key' ? labels.keyMissing : fill(labels.keyFailed, { reason }),
+          total: null,
+        }
       }
       const amount = Number(payload.balance)
       const currency = typeof payload.currency === 'string' && payload.currency !== ''
@@ -757,6 +783,7 @@ window.__ModuleLoader__.load({
         const readOnce = () => Promise.resolve()
           .then(() => readBalance(props.ctx, accountScope(), props.reasons, {
             keyFailed: props.keyFailed,
+            keyMissing: props.keyMissing,
             keyUnavailable: props.keyUnavailable,
           }))
           .then((answer) => {
@@ -767,8 +794,10 @@ window.__ModuleLoader__.load({
               setBalance(answer.text)
               setBalanceAt(Date.now())
               setFailSince(0)
+              failedSince = 0
             }
             else {
+              if (failedSince === 0) failedSince = Date.now()
               setFailSince((since) => (since === 0 ? Date.now() : since))
             }
             setBalanceSource(typeof answer.source === 'string' ? answer.source : '')
@@ -789,6 +818,7 @@ window.__ModuleLoader__.load({
           })
           .catch((error) => {
             if (!disposed) {
+              if (failedSince === 0) failedSince = Date.now()
               setFailSince((since) => (since === 0 ? Date.now() : since))
               setBalanceNote(fill(props.reasons.readError, { detail: errText(error) }))
             }
@@ -797,19 +827,24 @@ window.__ModuleLoader__.load({
 
         let timer = 0
         /**
-         * Read, then schedule the next attempt at the cadence the last one
-         * earned: the normal interval after a success, a shorter one after a
-         * failure, so a dropped connection is noticed and repaired quickly
-         * instead of leaving the failure on screen for a minute.
+         * The effect's own view of when the current failure run began, kept
+         * alongside the state because the scheduling below has to see the value
+         * from the latest read, not from the render that created this effect.
+         */
+        let failedSince = 0
+        /**
+         * Read, then schedule the next attempt: the normal interval after a
+         * success, a backing-off retry while reads keep failing.
          */
         const cycle = () => {
           if (disposed) return
           readOnce()
             .then((ok) => {
-              if (!disposed) timer = window.setTimeout(cycle, ok ? BALANCE_REFRESH_MS : BALANCE_RETRY_MS)
+              if (disposed) return
+              timer = window.setTimeout(cycle, ok ? BALANCE_REFRESH_MS : retryDelayFor(failedSince, Date.now()))
             })
             .catch(() => {
-              if (!disposed) timer = window.setTimeout(cycle, BALANCE_RETRY_MS)
+              if (!disposed) timer = window.setTimeout(cycle, retryDelayFor(failedSince, Date.now()))
             })
         }
         /** Read now, because something outside says the conditions changed. */
@@ -1058,6 +1093,7 @@ window.__ModuleLoader__.load({
         balanceSourceAccount: 'DeepSeek 账号登录',
         balanceSourceKey: 'API key',
         keyFailed: 'API key 余额不可用（{reason}）',
+        keyMissing: '未配置 API key',
         keyUnavailable: '平台标记该账户余额不可用（is_available=false）',
         holidayStaleHint: '节假日表只覆盖到 2026-12-31：此后法定节假日会被当作工作日，峰谷判定可能不准，请更新表后重装。',
         spendSourceLabel: '今日已用来源',
@@ -1090,6 +1126,7 @@ window.__ModuleLoader__.load({
         balanceSourceAccount: 'DeepSeek account sign-in',
         balanceSourceKey: 'API key',
         keyFailed: 'API key balance unavailable ({reason})',
+        keyMissing: 'no API key configured',
         keyUnavailable: 'the platform marks this account balance as unavailable (is_available=false)',
         holidayStaleHint: 'The holiday table only covers up to 2026-12-31: after that a statutory holiday is treated as a working day, so the peak window can be wrong. Update the table and reinstall.',
         spendSourceLabel: 'spent today, source',
@@ -1248,6 +1285,7 @@ window.__ModuleLoader__.load({
         ruleLabel: t('rule'),
         spentLabel: t('spent'),
         keyFailed: t('keyFailed'),
+        keyMissing: t('keyMissing'),
         keyUnavailable: t('keyUnavailable'),
         holidayStaleHint: t('holidayStaleHint'),
         balanceSourceLabel: t('balanceSourceLabel'),
@@ -1311,6 +1349,8 @@ window.__ModuleLoader__.load({
         beijing,
         isHolidayTableStale,
         holidayTableLast: HOLIDAY_TABLE_LAST,
+        retryDelayFor,
+        failureGraceMs: FAILURE_GRACE_MS,
       },
     }
   },

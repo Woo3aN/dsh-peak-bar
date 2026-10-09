@@ -63,6 +63,14 @@ window.__ModuleLoader__.load({
      * cached for 25s, so trying sooner than this costs nothing.
      */
     const BALANCE_RETRY_MS = 15000
+    /**
+     * How long a failing read is tolerated before it is written anywhere. A
+     * transient failure is reported by the platform as `status: "failed"`, and
+     * showing the reason for one such blip made it flash on and off; the mature
+     * balance widgets keep the last value and mark it stale instead of printing the
+     * error, which is what this delay buys.
+     */
+    const FAILURE_GRACE_MS = 30000
     /** One-second clock is enough: the capsule shows mm:ss. */
     const CLOCK_MS = 1000
 
@@ -699,6 +707,17 @@ window.__ModuleLoader__.load({
       const [now, setNow] = React.useState(() => Date.now())
       const [balance, setBalance] = React.useState(undefined)
       const [balanceSource, setBalanceSource] = React.useState('')
+      /**
+       * When the current run of failed reads began; 0 while the last read worked.
+       * One failure is not worth reporting — the account platform reports a
+       * transient failure as `status: "failed"`, and the reason used to appear and
+       * vanish again seconds later — so the note is held back until the failure has
+       * lasted `FAILURE_GRACE_MS`. The last known amount stays on screen meanwhile,
+       * and the panel carries the full reason.
+       */
+      const [failSince, setFailSince] = React.useState(0)
+      /** Whether any read has ever succeeded; an empty `—` needs its reason now. */
+      const [balanceAt, setBalanceAt] = React.useState(0)
       const [balanceNote, setBalanceNote] = React.useState('')
       const [spent, setSpent] = React.useState('')
       const [spentSource, setSpentSource] = React.useState('')
@@ -744,7 +763,14 @@ window.__ModuleLoader__.load({
             if (disposed) return false
             // A failed read keeps the last known amount on screen, like the
             // other balance surfaces do; only the note changes.
-            if (answer.text !== null) setBalance(answer.text)
+            if (answer.text !== null) {
+              setBalance(answer.text)
+              setBalanceAt(Date.now())
+              setFailSince(0)
+            }
+            else {
+              setFailSince((since) => (since === 0 ? Date.now() : since))
+            }
             setBalanceSource(typeof answer.source === 'string' ? answer.source : '')
             setBalanceNote(answer.note)
             // The ledger round trip runs after the readout is on screen: a slow
@@ -762,7 +788,10 @@ window.__ModuleLoader__.load({
             return answer.text !== null
           })
           .catch((error) => {
-            if (!disposed) setBalanceNote(fill(props.reasons.readError, { detail: errText(error) }))
+            if (!disposed) {
+              setFailSince((since) => (since === 0 ? Date.now() : since))
+              setBalanceNote(fill(props.reasons.readError, { detail: errText(error) }))
+            }
             return false
           })
 
@@ -808,12 +837,22 @@ window.__ModuleLoader__.load({
       const at = new Date(now)
       const valley = isValley(at)
       const until = nextSwitch(at)
+      /**
+       * The capsule's own note. Before any reading has succeeded the reason is the
+       * whole story — a bare `--` with no explanation is what this plugin exists
+       * not to do — but once a number is on screen a failure only makes that number
+       * stale, so it is marked in two words and the reason stays in the panel.
+       */
+      const capsuleNote = balanceAt === 0
+        ? balanceNote
+        : (failSince !== 0 && now - failSince >= FAILURE_GRACE_MS ? props.staleLabel : '')
       return {
         valley,
         label: valley ? props.peakOffLabel : props.peakOnLabel,
         remaining: until === null ? '' : countdown(until.getTime() - now, props.countdownFormats),
         balanceText: balance === undefined ? '—' : (balance ?? '--'),
         balanceNote,
+        capsuleNote,
         balanceSource,
         spentText: spent,
         spentSource,
@@ -852,7 +891,7 @@ window.__ModuleLoader__.load({
         parts.push(`${props.spentLabel} ${status.spentText}${suffix}`)
       }
       // The failure note is the one thing the capsule can only show truncated.
-      if (status.balanceNote !== '') parts.push(status.balanceNote)
+      if (status.capsuleNote !== '') parts.push(status.capsuleNote)
       // Only promise a click when the shell can deliver one.
       parts.push(props.layoutScope() === null ? props.panelUnavailable : props.clickHint)
       return parts.join(' · ')
@@ -915,7 +954,7 @@ window.__ModuleLoader__.load({
           // The reason is rendered inline, not only in the tooltip: a lone `—`
           // cannot be told apart from "still loading", and the caption strip is
           // the only place the user is already looking.
-          status.balanceNote === '' ? null : h('span', { className: 'dshPeakBarCapsule__note' }, status.balanceNote)))
+          status.capsuleNote === '' ? null : h('span', { className: 'dshPeakBarCapsule__note' }, status.capsuleNote)))
     }
 
     /**
@@ -984,7 +1023,12 @@ window.__ModuleLoader__.load({
      * and no own typography — the panel inherits the host's body text.
      */
     const PANEL_CSS = [
-      '.dshPeakBarPanel{padding:18px 20px;max-width:520px;color:var(--dsw-alias-label-primary)}',
+      // The panel owns the whole main area, the way the conversation does. An
+      // earlier version capped the box at 520px for readability, which left the
+      // panel as a narrow column in the middle of the window; the reading width
+      // belongs on the prose, not on the panel.
+      '.dshPeakBarPanel{box-sizing:border-box;width:100%;height:100%;overflow:auto;padding:20px 28px;',
+      'color:var(--dsw-alias-label-primary)}',
       '.dshPeakBarPanel__head{display:flex;align-items:center;gap:8px;margin-bottom:12px}',
       '.dshPeakBarPanel__close{margin-left:auto;border:0;background:none;padding:2px 6px;border-radius:6px;cursor:pointer;',
       'color:var(--dsw-alias-label-tertiary);font:inherit;line-height:1}',
@@ -992,11 +1036,11 @@ window.__ModuleLoader__.load({
       '.dshPeakBarPanel__tag{font-weight:600;color:var(--dsh-peak-bar-offpeak,var(--dsw-alias-state-success-primary,var(--dsw-alias-label-secondary)))}',
       '.dshPeakBarPanel__tag--peak{color:var(--dsh-peak-bar-peak,var(--dsw-alias-brand-primary))}',
       '.dshPeakBarPanel__title{color:var(--dsw-alias-label-tertiary)}',
-      '.dshPeakBarPanel__rows{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0}',
+      '.dshPeakBarPanel__rows{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0;max-width:680px}',
       '.dshPeakBarPanel__rows dt{color:var(--dsw-alias-label-secondary)}',
       '.dshPeakBarPanel__rows dd{margin:0;font-variant-numeric:tabular-nums}',
-      '.dshPeakBarPanel__note{margin:14px 0 0;color:var(--dsw-alias-label-tertiary);line-height:1.6}',
-      '.dshPeakBarPanel__warn{margin:14px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6}',
+      '.dshPeakBarPanel__note{margin:14px 0 0;color:var(--dsw-alias-label-tertiary);line-height:1.6;max-width:72ch}',
+      '.dshPeakBarPanel__warn{margin:14px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6;max-width:72ch}',
     ].join('')
 
     const locale = {
@@ -1024,6 +1068,7 @@ window.__ModuleLoader__.load({
         clickHint: '点击查看详情',
         panelUnavailable: '详情面板暂不可用',
         close: '关闭（返回对话）',
+        stale: '余额未刷新',
         reasonNoRemote: '账号 Remote 不可用（{detail}）',
         reasonCallFailed: '账号接口调用失败：{detail}',
         reasonNotReady: '账号未就绪（status={status}）',
@@ -1055,6 +1100,7 @@ window.__ModuleLoader__.load({
         clickHint: 'click for details',
         panelUnavailable: 'the details panel is unavailable',
         close: 'Close (back to the conversation)',
+        stale: 'balance not refreshed',
         reasonNoRemote: 'account Remote unavailable ({detail})',
         reasonCallFailed: 'account call failed: {detail}',
         reasonNotReady: 'account not ready (status={status})',
@@ -1215,6 +1261,7 @@ window.__ModuleLoader__.load({
         clickHint: t('clickHint'),
         panelUnavailable: t('panelUnavailable'),
         closeLabel: t('close'),
+        staleLabel: t('stale'),
         countdownFormats: { long: t('countdownLong'), short: t('countdownShort') },
         reasons: {
           noRemote: t('reasonNoRemote'),

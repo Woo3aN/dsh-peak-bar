@@ -46,6 +46,21 @@ const styles = []
  */
 const timers = []
 let timerSeq = 0
+/** One-second interval callbacks the plugin registered, so its clock can tick. */
+const intervals = []
+/** Milliseconds added to the wall clock, so time-based rules are observable. */
+let clockOffset = 0
+const realNow = Date.now
+Date.now = () => realNow() + clockOffset
+/** Let the microtask queue drain, the way a promise settling does. */
+const flush = () => new Promise((resolve) => {
+  setTimeout(resolve, 0)
+})
+/** Let a second pass: move the clock and run the plugin's one-second ticks. */
+function tickClock(ms = 1000) {
+  clockOffset += ms
+  for (const fn of intervals) fn()
+}
 /** Listeners the plugin registered, by target and event name. */
 const listeners = { window: {}, document: {} }
 function listen(target, event, fn) {
@@ -70,7 +85,10 @@ globalThis.window = {
     const at = timers.findIndex((row) => row.id === id)
     if (at >= 0) timers.splice(at, 1)
   },
-  setInterval: () => 0,
+  setInterval: (fn) => {
+    intervals.push(fn)
+    return intervals.length
+  },
   clearInterval: () => {},
   addEventListener: (event, fn) => listen('window', event, fn),
   removeEventListener: (event, fn) => unlisten('window', event, fn),
@@ -608,20 +626,19 @@ try {
 }
 
 /**
- * A dropped connection, and the way back. The account read fails once — the
- * platform reports that as `status: "failed"` / a thrown call — the capsule says
- * why, the next attempt is scheduled sooner than the normal interval, and the
- * moment the browser reports the network back the plugin retries at once instead
- * of waiting the interval out.
+ * A failing read is not shouted about. The platform reports a blip as
+ * `status: "failed"`, and writing the reason for one made it flash on and off, so
+ * a failure is only reported once it has lasted the grace period: the last known
+ * amount stays on screen and is marked in two words, while the full reason lives
+ * in the panel. Recovery clears the mark at once.
  */
-let flakyCall = 0
+let flakyMode = 'ok'
 const flakyCtx = makeCtx({
   remote: {
     account: {
       getBalance: async (meta) => {
         balanceCalls.push(meta)
-        flakyCall += 1
-        if (flakyCall === 1) throw new Error('offline')
+        if (flakyMode === 'fail') throw new Error('offline')
         return {
           ok: true,
           value: { status: 'ready', value: [{ currency: 'CNY', balance: '30.00' }], bonusWallets: [] },
@@ -633,26 +650,46 @@ const flakyCtx = makeCtx({
 module.apply(flakyCtx)
 const flakyCapsule = registrations[registrations.length - 1]
 const flakyInjected = flakyCapsule.options.inject()
-const timersBeforeFlaky = timerSeq
 renderEntry(flakyCapsule, flakyInjected, 'flaky')
-await new Promise((resolve) => {
-  setTimeout(resolve, 0)
-})
-const afterFailure = renderEntry(flakyCapsule, flakyInjected, 'flaky')
-assert.match(afterFailure, /zh:reasonCallFailed/, 'a thrown account read is reported on the capsule')
+await flush()
+const firstOk = renderEntry(flakyCapsule, flakyInjected, 'flaky')
+assert.match(firstOk, /¥30\.00/, 'a successful read puts the balance on the capsule')
+assert.equal(/zh:stale/.test(firstOk), false, 'a healthy read is not marked stale')
+
+flakyMode = 'fail'
+const timersBeforeFailure = timerSeq
+renderEntry(flakyCapsule, flakyInjected, 'flaky')
+await flush()
+const duringGrace = renderEntry(flakyCapsule, flakyInjected, 'flaky')
+assert.match(duringGrace, /¥30\.00/, 'the last known amount stays on screen while the read fails')
+assert.equal(/zh:stale/.test(duringGrace), false, 'one failed read is not reported yet')
+assert.equal(/zh:reasonCallFailed/.test(duringGrace), false, 'and no reason is written on the capsule')
 // Timers are selected by id, not by array index: `clearTimeout` splices entries
 // out, so any index recorded earlier points at the wrong row afterwards.
 assert.ok(
-  timers.some((row) => row.id > timersBeforeFlaky && row.delay === 15000),
+  timers.some((row) => row.id > timersBeforeFailure && row.delay === 15000),
   'a failed read retries sooner than the normal interval',
 )
 
+tickClock(31000)
+const afterGrace = renderEntry(flakyCapsule, flakyInjected, 'flaky')
+assert.match(afterGrace, /zh:stale/, 'a failure that lasts is marked stale, in two words')
+assert.equal(/zh:reasonCallFailed/.test(afterGrace), false, 'the capsule still does not carry the reason')
+const flakyPanel = registrations[registrations.length - 2]
+const flakyPanelInjected = flakyPanel.options.inject()
+renderEntry(flakyPanel, flakyPanelInjected, 'flaky-panel')
+await flush()
+assert.match(
+  renderEntry(flakyPanel, flakyPanelInjected, 'flaky-panel'),
+  /zh:reasonCallFailed/,
+  'the panel carries the reason the capsule only marks',
+)
+
+flakyMode = 'ok'
 const callsBeforeOnline = balanceCalls.length
 const timersBeforeOnline = timerSeq
 fire('window', 'online')
-await new Promise((resolve) => {
-  setTimeout(resolve, 0)
-})
+await flush()
 // The harness shares one listener table across every scenario and re-runs effects
 // on each render (React would have cleaned the previous one up), so one event
 // reaches several listener instances. What matters is that the event reads
@@ -664,7 +701,7 @@ assert.ok(
 )
 const afterOnline = renderEntry(flakyCapsule, flakyInjected, 'flaky')
 assert.match(afterOnline, /¥30\.00/, 'the balance appears once the connection is back')
-assert.equal(/zh:reasonCallFailed/.test(afterOnline), false, 'the failure note clears itself')
+assert.equal(/zh:stale/.test(afterOnline), false, 'the stale mark clears with the first successful read')
 assert.ok(
   timers.some((row) => row.id > timersBeforeOnline && row.delay === 60000),
   'a successful read returns to the normal interval',

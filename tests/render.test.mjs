@@ -322,8 +322,10 @@ await new Promise((resolve) => {
 assert.match(renderEntry(emptyPanel, emptyInjected, 'empty'), /zh:reasonNoWallet/)
 
 /**
- * The reason must be readable without hovering: the capsule renders it inline,
- * because a lone `—` cannot be told apart from "still loading".
+ * The failure must be readable without hovering: the capsule says the read failed
+ * inline, because a lone `—` cannot be told apart from "still loading". The
+ * platform's own wording is longer than the caption strip can hold, so it goes to
+ * the tooltip and the panel instead of overflowing the window edge.
  */
 const emptyCapsule = registrations[registrations.length - 1]
 const emptyCapsuleInjected = emptyCapsule.options.inject()
@@ -331,10 +333,17 @@ renderEntry(emptyCapsule, emptyCapsuleInjected, 'empty-capsule')
 await new Promise((resolve) => {
   setTimeout(resolve, 0)
 })
+const emptyCapsuleText = renderEntry(emptyCapsule, emptyCapsuleInjected, 'empty-capsule')
+assert.match(emptyCapsuleText, /zh:readFailed/, 'the capsule states that the read failed')
+assert.equal(
+  /zh:reasonNoWallet/.test(emptyCapsuleText),
+  false,
+  'the long reason is not written across the caption strip',
+)
 assert.match(
-  renderEntry(emptyCapsule, emptyCapsuleInjected, 'empty-capsule'),
+  findButton({ type: emptyCapsule.component, props: {}, children: [] }, emptyCapsuleInjected, 'empty-capsule').props.title,
   /zh:reasonNoWallet/,
-  'the capsule states the failure reason inline',
+  'the tooltip carries the reason instead',
 )
 
 /**
@@ -351,7 +360,16 @@ await new Promise((resolve) => {
   setTimeout(resolve, 0)
 })
 const bareText = renderEntry(bareCapsule, bareInjected, 'no-remote')
-assert.match(bareText, /zh:reasonNoRemote/, 'a missing account Remote is reported')
+assert.match(bareText, /zh:readFailed/, 'a failed read says so on the capsule, in a few words')
+assert.equal(
+  /zh:reasonNoRemote/.test(bareText),
+  false,
+  'the platform reason stays off the capsule, which has no room for it',
+)
+// The reason is not lost: it goes where there is room, on the tooltip and in the
+// panel, so a bare `--` is still never left unexplained.
+const bareButton = findButton({ type: bareCapsule.component, props: {}, children: [] }, bareInjected, 'no-remote')
+assert.match(bareButton.props.title, /zh:reasonNoRemote/, 'the tooltip carries the reason in full')
 assert.match(bareText, /zh:peakOn|zh:peakOff/, 'the countdown still renders without the account side')
 
 /**

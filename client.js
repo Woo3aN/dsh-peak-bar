@@ -873,13 +873,15 @@ window.__ModuleLoader__.load({
       const valley = isValley(at)
       const until = nextSwitch(at)
       /**
-       * The capsule's own note. Before any reading has succeeded the reason is the
-       * whole story — a bare `--` with no explanation is what this plugin exists
-       * not to do — but once a number is on screen a failure only makes that number
-       * stale, so it is marked in two words and the reason stays in the panel.
+       * The capsule's own note, kept to a couple of words: the strip has room for
+       * a countdown and two amounts, and a platform reason can be sixty characters
+       * — long enough to push the capsule past the window edge and get it clipped.
+       * The full reason is in the tooltip and in the panel, both of which have the
+       * room; before any reading has succeeded the capsule still says plainly that
+       * the read failed rather than showing a bare `--`.
        */
       const capsuleNote = balanceAt === 0
-        ? balanceNote
+        ? props.readFailed
         : (failSince !== 0 && now - failSince >= FAILURE_GRACE_MS ? props.staleLabel : '')
       return {
         valley,
@@ -925,8 +927,9 @@ window.__ModuleLoader__.load({
         const suffix = status.spentSource === 'run' ? props.spentUnpersisted : ''
         parts.push(`${props.spentLabel} ${status.spentText}${suffix}`)
       }
-      // The failure note is the one thing the capsule can only show truncated.
-      if (status.capsuleNote !== '') parts.push(status.capsuleNote)
+      // The reason itself, in full: the capsule truncates it, the tooltip does not.
+      if (status.balanceNote !== '') parts.push(status.balanceNote)
+      else if (status.capsuleNote !== '') parts.push(status.capsuleNote)
       // Only promise a click when the shell can deliver one.
       parts.push(props.layoutScope() === null ? props.panelUnavailable : props.clickHint)
       return parts.join(' · ')
@@ -1048,7 +1051,7 @@ window.__ModuleLoader__.load({
       '.dshPeakBarCapsule__label{flex:none;color:var(--dsh-peak-bar-label,var(--dsw-alias-label-tertiary))}',
       '.dshPeakBarCapsule__money{flex:none;color:var(--dsh-peak-bar-text,var(--dsw-alias-label-primary));font-variant-numeric:tabular-nums}',
       '.dshPeakBarCapsule__spent{flex:none;color:var(--dsh-peak-bar-spent,var(--dsw-alias-label-secondary));font-variant-numeric:tabular-nums}',
-      '.dshPeakBarCapsule__note{flex:none;min-width:0;max-width:20em;overflow:hidden;text-overflow:ellipsis;',
+      '.dshPeakBarCapsule__note{flex:0 1 auto;min-width:0;max-width:20em;overflow:hidden;text-overflow:ellipsis;',
       'white-space:nowrap;color:var(--dsh-peak-bar-note,var(--dsw-alias-label-tertiary));font-size:.92em}',
       '@media (prefers-reduced-motion:reduce){.dshPeakBarCapsule{transition:none}}',
     ].join('')
@@ -1105,6 +1108,7 @@ window.__ModuleLoader__.load({
         panelUnavailable: '详情面板暂不可用',
         close: '关闭（返回对话）',
         stale: '余额未刷新',
+        readFailed: '余额读取失败',
         reasonNoRemote: '账号 Remote 不可用（{detail}）',
         reasonCallFailed: '账号接口调用失败：{detail}',
         reasonNotReady: '账号未就绪（status={status}）',
@@ -1138,6 +1142,7 @@ window.__ModuleLoader__.load({
         panelUnavailable: 'the details panel is unavailable',
         close: 'Close (back to the conversation)',
         stale: 'balance not refreshed',
+        readFailed: 'balance read failed',
         reasonNoRemote: 'account Remote unavailable ({detail})',
         reasonCallFailed: 'account call failed: {detail}',
         reasonNotReady: 'account not ready (status={status})',
@@ -1300,6 +1305,7 @@ window.__ModuleLoader__.load({
         panelUnavailable: t('panelUnavailable'),
         closeLabel: t('close'),
         staleLabel: t('stale'),
+        readFailed: t('readFailed'),
         countdownFormats: { long: t('countdownLong'), short: t('countdownShort') },
         reasons: {
           noRemote: t('reasonNoRemote'),

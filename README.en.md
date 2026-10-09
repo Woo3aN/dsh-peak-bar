@@ -1,5 +1,7 @@
 # dsh-peak-bar
 
+**English** | [简体中文](README.md)
+
 > ⚠️ **Pre-release** — the version is still `0.x`: CSS variable names and the file layout may change, and the interface is not frozen.
 
 **A small capsule centred in the window title bar: the DeepSeek API peak/off-peak window, the countdown to the next switch, the account balance, and today's spend.**
@@ -10,17 +12,17 @@ A plugin for DSH (DeepSeek Harness). Click the capsule to open a details panel i
 
 ---
 
-## What it looks like, and where it sits
+## Appearance and placement
 
 ![The capsule in the title bar (a real capture, default skin): the billing window, its countdown, the balance and today's spend, with the minimize / maximize / close buttons to its right](docs/capsule.png)
 
 ![A close-up of the capsule](docs/capsule-closeup.png)
 
-The capsule shows whether the current window is peak or off-peak, the countdown to the next switch, and the account balance; the countdown is accurate to the second. Clicking the capsule opens a details panel in the main area with the peak/off-peak state, the countdown to the next switch, the balance, today's spend and an explanation of the billing rules; **the `✕` in its top-right corner returns to the conversation**.
+The capsule shows whether the current window is peak or off-peak, the countdown to the next switch, and the account balance. The countdown **reads to the minute while more than an hour remains** (`59h 24m`) and **only gains seconds within the final hour** (`18m 57s`). Clicking the capsule opens a details panel in the main area with the peak/off-peak state, the countdown to the next switch, the balance, today's spend and an explanation of the billing rules; **the `✕` in its top-right corner returns to the conversation**.
 
 ![The details panel: the billing window, the countdown, the balance and today's spend, plus both sources and the billing rule](docs/panel.png)
 
-> The amounts and the countdown in these images are **illustrative values** (the real balance and spend have been replaced); everything else is untouched.
+> These captures were taken with the **Chinese UI** (the labels shown are the `zh` dictionary; the `en` dictionary renders "Off-peak / balance / spent today"). The amounts and the countdown in them are **illustrative values** — the real balance and spend have been replaced — and everything else is untouched.
 
 The capsule sits at the centre of the window title bar, on the same line as the minimize / close buttons on Windows and to their left (no overlap, no occlusion). The image above is a real capture (150% display scaling, 2115px wide); the capsule centre measures at **49.9%**.
 
@@ -34,7 +36,7 @@ The capsule is `position:absolute`, the seat is `pointer-events:none`, only the 
 - **A value has been read before** — the last numbers stay, and only a failure lasting **more than 2 minutes** raises the two-word marker "not refreshed". The platform reports brief hiccups as `status=failed` too, and those recur through the day, so the grace period is measured in minutes.
 - **No API key configured** — the capsule says "no API key configured": that is a configuration fact, not an error.
 
-**The full reason always lives in the tooltip and the details panel** (for example "账号未就绪（status=failed）", "账号 Remote 不可用"). The capsule is narrow and a platform reason runs to dozens of characters, so writing it there pushed the capsule past the window edge where it was clipped — the capsule carries a short phrase instead.
+**The full reason always lives in the tooltip and the details panel** (for example "account not ready (status=failed)", "account Remote unavailable"). The capsule is narrow and a platform reason runs to dozens of characters, so writing it there pushed the capsule past the window edge where it was clipped — the capsule carries a short phrase instead.
 
 Retries back off **15s → 30s → 60s** during a failure (the normal interval is 60s), so a brief hiccup heals quickly without hammering the platform. When the browser reports the network is back (`online`) or the window becomes visible again, it retries at once — so a dropped connection heals within seconds.
 
@@ -88,7 +90,7 @@ dsh plugin --profile web add "<absolute path of this directory, or package name>
 | everything else | off-peak, roughly half the peak price |
 | statutory holidays | off-peak all day |
 
-The countdown is accurate to the second. The holiday table's coverage is listed under [Known limitations](#known-limitations).
+The countdown **reads to the minute while more than an hour remains**, and to the second within the final hour. The holiday table's coverage is listed under [Known limitations](#known-limitations).
 
 ---
 
@@ -123,7 +125,7 @@ The ledger is written by the **Host half** to `<DSH_HOME>/.dsh-peak-bar.json` (b
 
 Without the Host route (a profile with no HTTP carrier, say), the capsule falls back to counting this run and keeps showing the billing window and balance — **what is lost is history, not function**.
 
-**Display**: both numbers in the capsule carry labels and no sign — for example `谷时 18分57秒 余额 ¥20.79 今日已用 ¥0.20`. Today's spend is shown to two decimals (or `<0.01` when too small to show two); the "today's spend" segment is omitted entirely when there has been no spend yet.
+**Display**: both numbers in the capsule carry labels and no sign — for example `Off-peak 18m 57s balance ¥20.79 spent today ¥0.20`. Today's spend is shown to two decimals (or `<0.01` when too small to show two); the "today's spend" segment is omitted entirely when there has been no spend yet.
 
 ---
 
@@ -212,7 +214,7 @@ You do not need the whole table when changing only a few variables: anything you
 
 ## Position
 
-The capsule's position is decided by the shell's `shell.overlay` layer (see the measurements under [What it looks like](#what-it-looks-like-and-where-it-sits)). To pin it yourself, override the seat class — **note that the class name is not a public contract and may change; verify it yourself**:
+The capsule's position is decided by the shell's `shell.overlay` layer (see the measurements under [Appearance and placement](#appearance-and-placement)). To pin it yourself, override the seat class — **note that the class name is not a public contract and may change; verify it yourself**:
 
 ```css
 /* genuinely window-centred: a position:fixed containing block is the viewport,

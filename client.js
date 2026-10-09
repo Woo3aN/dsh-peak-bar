@@ -786,7 +786,8 @@ window.__ModuleLoader__.load({
       }
       // The failure note is the one thing the capsule can only show truncated.
       if (status.balanceNote !== '') parts.push(status.balanceNote)
-      parts.push(props.clickHint)
+      // Only promise a click when the shell can deliver one.
+      parts.push(props.layoutScope() === null ? props.panelUnavailable : props.clickHint)
       return parts.join(' · ')
     }
 
@@ -804,14 +805,27 @@ window.__ModuleLoader__.load({
       const title = capsuleTooltip(props, status)
 
       /**
-       * Open this plugin's `main` panel. The `layout` service is read lazily
-       * and defensively: it belongs to the shell, not to this plugin's declared
-       * dependencies, so a profile that lacks it loses the click target rather
-       * than the capsule.
+       * Open this plugin's `main` panel.
+       *
+       * The shell's `layout` service is reached through the scope injected for it
+       * (see the layout scope in the real mount), never off this ctx: cordis
+       * refuses to read a service the plugin did not inject — the read throws —
+       * so the earlier version's `ctx.layout` lookup made every click a silent
+       * no-op. `layout.selectPanel` also throws when the id is not a live `main`
+       * key, so the call is guarded: a click must never throw into React's event
+       * handler.
        */
       const openPanel = () => {
-        const layout = props.ctx && props.ctx.layout
-        if (layout && typeof layout.selectPanel === 'function') layout.selectPanel(PANEL_ID)
+        const scope = props.layoutScope()
+        if (scope === null) return
+        try {
+          const layout = scope.layout
+          if (layout && typeof layout.selectPanel === 'function') layout.selectPanel(PANEL_ID)
+        } catch (error) {
+          if (typeof console !== 'undefined' && typeof console.error === 'function') {
+            console.error('[dsh-peak-bar] opening the details panel failed', error)
+          }
+        }
       }
 
       return h('div', { className: 'dshPeakBarSeat' },
@@ -938,6 +952,7 @@ window.__ModuleLoader__.load({
         spentUnpersisted: '（未持久化）',
         spentHint: '“今日已用”按余额减少观测累计（充值/赠金不计入）。账本由 Host 写入 $DSH_HOME，跨重启保留；Host 不可用时退回本次运行统计。',
         clickHint: '点击查看详情',
+        panelUnavailable: '详情面板暂不可用',
         reasonNoRemote: '账号 Remote 不可用（{detail}）',
         reasonCallFailed: '账号接口调用失败：{detail}',
         reasonNotReady: '账号未就绪（status={status}）',
@@ -967,6 +982,7 @@ window.__ModuleLoader__.load({
         spentUnpersisted: ' (not persisted)',
         spentHint: '"Spent today" accumulates the drops between balance readings (top-ups and granted credit are not counted). The ledger lives in $DSH_HOME, written by the Host half, so it survives restarts; when the Host is unavailable the capsule falls back to counting this run only.',
         clickHint: 'click for details',
+        panelUnavailable: 'the details panel is unavailable',
         reasonNoRemote: 'account Remote unavailable ({detail})',
         reasonCallFailed: 'account call failed: {detail}',
         reasonNotReady: 'account not ready (status={status})',
@@ -1080,9 +1096,32 @@ window.__ModuleLoader__.load({
         })
       }
 
+      /**
+       * The context the shell's `layout` service is reached through.
+       *
+       * The capsule opens this plugin's `main` panel with
+       * `layout.selectPanel(key)`, where the key is the one the `main` slot
+       * registration below uses. `layout` belongs to the shell, so it is injected
+       * optionally rather than declared at the top level: a profile without the
+       * layout package keeps the peak / valley capsule and only loses the click
+       * target, which the tooltip then admits instead of promising a panel.
+       */
+      let layoutScope = null
+      if (typeof ctx.inject === 'function') {
+        ctx.inject(['layout'], (scoped) => {
+          scoped.effect(() => {
+            layoutScope = scoped
+            return () => {
+              layoutScope = null
+            }
+          }, 'peak-bar: layout scope')
+        })
+      }
+
       const injected = () => ({
         ctx,
         accountScope: () => accountScope,
+        layoutScope: () => layoutScope,
         titleLabel: t('label'),
         peakOnLabel: t('peakOn'),
         peakOffLabel: t('peakOff'),
@@ -1102,6 +1141,7 @@ window.__ModuleLoader__.load({
         spentUnpersisted: t('spentUnpersisted'),
         spentHint: t('spentHint'),
         clickHint: t('clickHint'),
+        panelUnavailable: t('panelUnavailable'),
         countdownFormats: { long: t('countdownLong'), short: t('countdownShort') },
         reasons: {
           noRemote: t('reasonNoRemote'),

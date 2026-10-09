@@ -67,15 +67,29 @@ const module = captured.factory((id) => {
   throw new Error('unexpected require: ' + id)
 })
 
-/** The scope handed back for the nested `remote.account` injection. */
-function scopeFor(remote) {
-  return {
-    remote,
+/** Resolve a cordis service name, dotted names included, inside a scope. */
+function serviceIn(scope, name) {
+  return name.split('.').reduce((value, part) => (value === null || value === undefined ? undefined : value[part]), scope)
+}
+
+/**
+ * The scope handed back for a nested injection.
+ *
+ * It carries the services the plugin asks for by name, the way cordis hands a
+ * scoped context back: reading anything the scope does not carry is what a real
+ * plugin cannot do either — that is exactly how the click target broke, by
+ * reading `layout` off the plugin's own context instead of injecting it.
+ */
+function scopeFor(ctx) {
+  const scope = {
     effect: (fn) => {
       fn()
       return () => {}
     },
   }
+  if (Object.hasOwn(ctx, 'remote')) scope.remote = ctx.remote
+  if (Object.hasOwn(ctx, 'layout')) scope.layout = ctx.layout
+  return scope
 }
 
 /**
@@ -97,6 +111,8 @@ const dictionaries = {}
 const balanceCalls = []
 /** The active locale the fake locale service reports. */
 const ACTIVE_LOCALE = 'en'
+/** Panel ids the plugin asked the shell's layout service to select. */
+const openedPanels = []
 
 function makeCtx(overrides = {}) {
   const ctx = {
@@ -121,6 +137,11 @@ function makeCtx(overrides = {}) {
         return () => {}
       },
     },
+    // The shell provides `layout`; the plugin has to inject it to reach
+    // `selectPanel`. Scenarios that need its absence delete the key.
+    layout: {
+      selectPanel: (id) => openedPanels.push(id),
+    },
     remote: {
       account: {
         getBalance: async (meta) => {
@@ -134,8 +155,13 @@ function makeCtx(overrides = {}) {
       },
     },
   }
-  ctx.inject = (_deps, callback) => {
-    callback(scopeFor(ctx.remote))
+  ctx.inject = (deps, callback) => {
+    const scope = scopeFor(ctx)
+    // Cordis runs the callback once the injected services are available, so a
+    // missing one must leave the plugin's scope empty rather than hand it a
+    // scope without that service.
+    const ready = (deps ?? []).every((name) => serviceIn(scope, name) !== undefined)
+    if (ready) callback(scope)
   }
   return Object.assign(ctx, overrides)
 }
@@ -333,16 +359,39 @@ function findButton(node, data, root = 'entry') {
   return findButton(node.children ?? [], data, root)
 }
 
-const opened = []
-const clickable = {
-  ...injected,
-  ctx: { layout: { selectPanel: (id) => opened.push(id) } },
-}
+const clickable = injected
 const button = findButton({ type: registrations[1].component, props: {}, children: [] }, clickable)
 assert.ok(button !== null, 'the capsule renders a button')
 assert.equal(typeof button.props.onClick, 'function')
 button.props.onClick()
-assert.deepEqual(opened, ['peak-bar'], 'the capsule opens the status panel')
+assert.deepEqual(
+  openedPanels,
+  ['peak-bar'],
+  'the capsule opens the status panel through the injected layout service, with the main key',
+)
+
+/**
+ * Without the shell's `layout` service the capsule must not promise a click it
+ * cannot deliver. Reading `ctx.layout` without injecting it threw inside the
+ * click handler, which is precisely how every click turned into a silent no-op.
+ */
+const noLayoutCtx = makeCtx()
+delete noLayoutCtx.layout
+module.apply(noLayoutCtx)
+const noLayoutCapsule = registrations[registrations.length - 1]
+const noLayoutInjected = noLayoutCapsule.options.inject()
+const noLayoutButton = findButton(
+  { type: noLayoutCapsule.component, props: {}, children: [] },
+  noLayoutInjected,
+  'no-layout',
+)
+assert.match(
+  noLayoutButton.props.title,
+  /zh:panelUnavailable$/,
+  'the tooltip admits the panel is unavailable instead of promising a click',
+)
+noLayoutButton.props.onClick() // must not throw
+assert.deepEqual(openedPanels, ['peak-bar'], 'no panel is selected when layout is absent')
 
 /**
  * The tooltip must not blink. A native `title` tooltip is torn down whenever its

@@ -1,0 +1,101 @@
+name: release
+
+# Two ways in: pushing a version tag, or publishing a Release in the UI.
+# `workflow_dispatch` exists so an existing tag can be back-filled with assets
+# without re-tagging — the workflow file only has to be on the default branch.
+on:
+  push:
+    tags: ['v*']
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to attach assets to, e.g. v0.3.0'
+        required: true
+
+# Uploading release assets writes to the repository.
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # `git archive <tag>` needs the tag object, and a dispatch run needs
+          # history the default shallow clone does not carry.
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve the tag and version
+        id: v
+        run: |
+          TAG="${{ github.event.inputs.tag || github.event.release.tag_name || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "ver=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag=$TAG version=${TAG#v}"
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check the manifest version matches the tag
+        run: |
+          MANIFEST="$(node -p "require('./package.json').version")"
+          TAGVER="${{ steps.v.outputs.ver }}"
+          echo "package.json=$MANIFEST  tag=$TAGVER"
+          if [ "$MANIFEST" != "$TAGVER" ]; then
+            echo "::warning title=Version mismatch::package.json is $MANIFEST but the tag says $TAGVER — the tarball will be labelled $TAGVER."
+          fi
+
+      - name: Run the tests before publishing anything
+        run: npm test
+        env:
+          DSH_HOME: ${{ runner.temp }}/dsh-peak-bar-release
+
+      # A directory to drop into DSH's "add plugin" dialog.
+      - name: Build the extract-and-use zip
+        run: |
+          git archive --format=zip \
+            --prefix=dsh-peak-bar/ \
+            -o "dsh-peak-bar-${{ steps.v.outputs.ver }}.zip" \
+            "${{ steps.v.outputs.tag }}" \
+            -- index.js client.js icon.svg cordis.patch.yml package.json \
+               locale tests docs README.md README.en.md CHANGELOG.md LICENSE
+
+      # The same layout npm would publish, named after the tag.
+      # Guarded: when the manifest version already matches the tag, npm has
+      # produced the target name and `mv x x` would fail the step.
+      - name: Build the npm tarball
+        run: |
+          npm pack
+          TARGET="dsh-peak-bar-${{ steps.v.outputs.ver }}.tgz"
+          for f in dsh-peak-bar-*.tgz; do
+            if [ "$f" != "$TARGET" ]; then mv "$f" "$TARGET"; fi
+          done
+          ls -la dsh-peak-bar-*.tgz
+
+      - name: List what will be uploaded
+        run: ls -la dsh-peak-bar-*
+
+      - name: Create the Release if it does not exist yet
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "${{ steps.v.outputs.tag }}" >/dev/null 2>&1 \
+            || gh release create "${{ steps.v.outputs.tag }}" \
+                 --title "${{ steps.v.outputs.ver }}" --generate-notes
+
+      - name: Upload the assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ steps.v.outputs.tag }}" dsh-peak-bar-*.zip dsh-peak-bar-*.tgz --clobber
+
+      - name: Show the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release view "${{ steps.v.outputs.tag }}" --json assets --jq '.assets[] | "\(.name)  \(.size) bytes"'

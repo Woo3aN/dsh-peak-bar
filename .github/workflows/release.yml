@@ -1,8 +1,15 @@
-name: release
+name: Release
 
-# Two ways in: pushing a version tag, or publishing a Release in the UI.
-# `workflow_dispatch` exists so an existing tag can be back-filled with assets
-# without re-tagging — the workflow file only has to be on the default branch.
+# 把打包好的附件挂到 Release 上，并用 CHANGELOG 对应小节写 Release 说明。
+# Release 不存在时会自动创建（0.x 一律标为 pre-release）。
+#
+# 触发方式三选一：
+#   1. 推 tag（形如 v0.3.0）—— 自动打附件
+#   2. 在网页上点 Publish release —— 自动打附件
+#   3. Actions 页手动 Run workflow（填一个**已存在**的 tag 名）
+#
+# 版本号规范见 CHANGELOG.md 开头：tag 是唯一版本来源，0.x 一律 pre-release。
+
 on:
   push:
     tags: ['v*']
@@ -11,10 +18,10 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to attach assets to, e.g. v0.3.0'
+        description: '要挂附件的 tag —— 必须已存在，例如 v0.3.0'
         required: true
+        type: string
 
-# Uploading release assets writes to the repository.
 permissions:
   contents: write
 
@@ -25,40 +32,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # `git archive <tag>` needs the tag object, and a dispatch run needs
-          # history the default shallow clone does not carry.
+          # `git archive <tag>` 需要 tag 对象；手动 dispatch 时默认的浅克隆也拿不到历史。
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Resolve the tag and version
+      - name: 解析 tag 与版本号
         id: v
         run: |
           TAG="${{ github.event.inputs.tag || github.event.release.tag_name || github.ref_name }}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "ver=${TAG#v}" >> "$GITHUB_OUTPUT"
-          echo "Resolved tag=$TAG version=${TAG#v}"
+          echo "tag=$TAG  version=${TAG#v}"
 
-      - name: Use Node.js 22
+      - name: 使用 Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      - name: Check the manifest version matches the tag
+      - name: 核对 manifest 版本与 tag 是否一致
         run: |
           MANIFEST="$(node -p "require('./package.json').version")"
           TAGVER="${{ steps.v.outputs.ver }}"
           echo "package.json=$MANIFEST  tag=$TAGVER"
           if [ "$MANIFEST" != "$TAGVER" ]; then
-            echo "::warning title=Version mismatch::package.json is $MANIFEST but the tag says $TAGVER — the tarball will be labelled $TAGVER."
+            echo "::warning title=版本不一致::package.json 是 $MANIFEST，而 tag 是 $TAGVER —— 附件会按 $TAGVER 命名。"
           fi
 
-      - name: Run the tests before publishing anything
+      # 打包前先跑测试，测试不过就不产出任何附件。
+      - name: 跑测试
         run: npm test
         env:
           DSH_HOME: ${{ runner.temp }}/dsh-peak-bar-release
 
-      # A directory to drop into DSH's "add plugin" dialog.
-      - name: Build the extract-and-use zip
+      # 解压即用：解出来是 dsh-peak-bar/ 目录，直接投给 DSH 的「添加插件」。
+      # 只导出被 git 跟踪的文件，所以不会混进 .git / .github；从对象库导出，换行天然是 LF。
+      - name: 打包（解压即用的 zip）
         run: |
           git archive --format=zip \
             --prefix=dsh-peak-bar/ \
@@ -67,35 +75,70 @@ jobs:
             -- index.js client.js icon.svg cordis.patch.yml package.json \
                locale tests docs README.md README.en.md CHANGELOG.md LICENSE
 
-      # The same layout npm would publish, named after the tag.
-      # Guarded: when the manifest version already matches the tag, npm has
-      # produced the target name and `mv x x` would fail the step.
-      - name: Build the npm tarball
+      # npm 那份，按 tag 命名。有守卫：manifest 版本已等于 tag 时 npm 产出的就是目标名，
+      # 此时 `mv x x` 会返回非零让这一步失败。
+      - name: 打包（npm tarball）
         run: |
           npm pack
           TARGET="dsh-peak-bar-${{ steps.v.outputs.ver }}.tgz"
           for f in dsh-peak-bar-*.tgz; do
             if [ "$f" != "$TARGET" ]; then mv "$f" "$TARGET"; fi
           done
-          ls -la dsh-peak-bar-*.tgz
+          ls -la dsh-peak-bar-*
 
-      - name: List what will be uploaded
-        run: ls -la dsh-peak-bar-*
-
-      - name: Create the Release if it does not exist yet
+      - name: 确保 Release 存在（0.x 标 pre-release）
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release view "${{ steps.v.outputs.tag }}" >/dev/null 2>&1 \
             || gh release create "${{ steps.v.outputs.tag }}" \
-                 --title "${{ steps.v.outputs.ver }}" --generate-notes
+                 --title "${{ steps.v.outputs.ver }}" \
+                 --generate-notes --prerelease
 
-      - name: Upload the assets
+      # 已有 Release 也拉回规范：标题用不带 v 的版本号，0.x 一律 pre-release。
+      - name: 规范 Release 标题与 pre-release 标记
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ steps.v.outputs.tag }}" dsh-peak-bar-*.zip dsh-peak-bar-*.tgz --clobber
+        run: |
+          gh release edit "${{ steps.v.outputs.tag }}" \
+            --title "${{ steps.v.outputs.ver }}" --prerelease
 
-      - name: Show the release
+      - name: 上传附件
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release view "${{ steps.v.outputs.tag }}" --json assets --jq '.assets[] | "\(.name)  \(.size) bytes"'
+        run: |
+          gh release upload "${{ steps.v.outputs.tag }}" \
+            dsh-peak-bar-*.zip dsh-peak-bar-*.tgz --clobber
+
+      # CHANGELOG 里每个版本都有成稿的中文说明，直接取对应小节当 Release 描述，
+      # 不用 GitHub 自动生成的英文提交列表。
+      - name: 用 CHANGELOG 对应小节写 Release 说明
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VER="${{ steps.v.outputs.ver }}"
+          awk -v VER="$VER" '
+            index($0, "## [" VER "]") == 1 { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > body.md
+          if [ -s body.md ]; then
+            {
+              echo '> ⚠️ **pre-release** —— `0.x` 表示尚未稳定，接口、CSS 变量名与文件结构可能变动。'
+              echo ''
+              echo '安装方式见 [README](https://github.com/Woo3aN/dsh-peak-bar#安装)，'
+              echo '也可以直接下载下面的 `.zip` 解压后添加本地目录。'
+              echo ''
+              cat body.md
+            } > release-notes.md
+            gh release edit "${{ steps.v.outputs.tag }}" --notes-file release-notes.md
+          else
+            echo "CHANGELOG 里没有 [${VER}] 小节，保留自动生成的说明"
+          fi
+
+      - name: 结果
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "${{ steps.v.outputs.tag }}" --json name,tagName,isPrerelease,assets \
+            --jq '"name=\(.name)  tag=\(.tagName)  prerelease=\(.isPrerelease)\n" + (.assets[] | "  \(.name)  \(.size) bytes")'

@@ -129,6 +129,16 @@ Without the Host route (a profile with no HTTP carrier, say), the capsule falls 
 
 ---
 
+## Language
+
+The plugin has **no language switch of its own** — it follows DSH's UI language, and one switch moves the capsule and the panel together:
+
+> DSH **Settings → General → Language** → `中文` / `English`
+
+Internally every visible string in the capsule and the panel goes through `ctx.locale` (the dictionaries are registered under the plugin's own namespace). Both `zh` and `en` carry the full key set, `zh` falls back to `en`, and no language DSH offers can end up printing raw keys. Switching needs **no reinstall and no restart**: the framework-injected `t` is backed by the host's `getSnapshot` / `subscribe`, and the capsule re-renders once a second anyway.
+
+The title and description on the plugin card come from `locale/zh.json` / `locale/en.json`.
+
 ## Following the theme and the skin
 
 **Following is the default, and it needs no configuration.** Every colour variable defaults to a host semantic token (`--dsw-alias-*`), so the capsule takes the active skin's palette, its light and dark pair and its accent colour on its own. Motion uses the theme's `--ds-transition-duration` / `--ds-ease-in-out`, the focus ring is the host's `--dsw-focus-ring-*`, and `prefers-reduced-motion` turns the transition off.

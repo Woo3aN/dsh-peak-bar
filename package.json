@@ -1,0 +1,61 @@
+{
+  "name": "dsh-rhine-statusbar",
+  "version": "0.3.0",
+  "description": "莱茵生命配色：窗口标题栏居中一枚胶囊，显示 DeepSeek API 峰谷时段与账户余额，点击展开详情。",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "balance",
+    "peak",
+    "off-peak",
+    "statusbar",
+    "titlebar"
+  ],
+  "author": "dsh-rhine-statusbar contributors",
+  "license": "MIT",
+  "type": "module",
+  "main": "./index.js",
+  "icon": "./icon.svg",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "icon.svg",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "tests",
+    "README.md",
+    "README.en.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node tests/peak.test.mjs && node tests/render.test.mjs && node tests/host.test.mjs"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-api-remotes"
+      ]
+    }
+  }
+}

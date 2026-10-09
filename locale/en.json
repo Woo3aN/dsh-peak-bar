@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Rate & balance capsule",
+    "description": "Shows the DeepSeek API peak / off-peak window and the account balance in the middle of the window caption strip; click for details. Colours follow the active skin by default."
+  }
+}

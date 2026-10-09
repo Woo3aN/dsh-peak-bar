@@ -10,9 +10,9 @@ One small capsule centred in the window title bar: it shows the DeepSeek API pea
 
 <!-- Screenshot: the capsule in the title bar (to be added) -->
 
-The capsule shows whether the current window is peak or off-peak, the countdown to the next switch, and the account balance; the countdown is accurate to the second. Clicking the capsule opens a details panel in the main area with the peak/off-peak state, the countdown to the next switch, the balance, and an explanation of the billing rules.
+The capsule shows whether the current window is peak or off-peak, the countdown to the next switch, and the account balance; the countdown is accurate to the second. Clicking the capsule opens a details panel in the main area with the peak/off-peak state, the countdown to the next switch, the balance, and an explanation of the billing rules; **the ✕ in its top-right corner returns to the conversation**.
 
-When the read fails the capsule does not silently show `--`; it writes the reason on itself, for example “账号 Remote 不可用”, “账号未就绪（status=…）” or “账号没有余额钱包”.
+When the read fails the capsule does not silently show `--`; it writes the reason on itself, for example “账号 Remote 不可用”, “账号未就绪（status=…）” or “账号没有余额钱包”. It then **retries every 15 seconds** instead of the normal 60, and retries at once when the browser reports the network back (`online`) or the window becomes visible again — so a dropped connection repairs itself within seconds, and the reason disappears on its own.
 
 The capsule sits in the middle of the window title bar, on the same row as the minimize and close buttons on Windows as well.
 

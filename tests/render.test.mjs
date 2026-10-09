@@ -40,15 +40,45 @@ const react = {
 let captured = null
 /** Stylesheet text pushed through the fake document's style tag. */
 const styles = []
+/**
+ * Timers the plugin scheduled, so the retry cadence can be asserted without a
+ * fake clock: every entry keeps the delay it was asked for and the callback.
+ */
+const timers = []
+let timerSeq = 0
+/** Listeners the plugin registered, by target and event name. */
+const listeners = { window: {}, document: {} }
+function listen(target, event, fn) {
+  listeners[target][event] = [...(listeners[target][event] ?? []), fn]
+}
+function unlisten(target, event, fn) {
+  listeners[target][event] = (listeners[target][event] ?? []).filter((row) => row !== fn)
+}
+/** Fire every listener registered for an event, the way the browser would. */
+function fire(target, event) {
+  for (const fn of listeners[target][event] ?? []) fn()
+}
+
 globalThis.window = {
   __ModuleLoader__: { load: (definition) => { captured = definition } },
+  setTimeout: (fn, delay) => {
+    timerSeq += 1
+    timers.push({ id: timerSeq, fn, delay })
+    return timerSeq
+  },
+  clearTimeout: (id) => {
+    const at = timers.findIndex((row) => row.id === id)
+    if (at >= 0) timers.splice(at, 1)
+  },
   setInterval: () => 0,
   clearInterval: () => {},
+  addEventListener: (event, fn) => listen('window', event, fn),
+  removeEventListener: (event, fn) => unlisten('window', event, fn),
 }
 globalThis.document = {
   visibilityState: 'visible',
-  addEventListener: () => {},
-  removeEventListener: () => {},
+  addEventListener: (event, fn) => listen('document', event, fn),
+  removeEventListener: (event, fn) => unlisten('document', event, fn),
   head: { querySelector: () => null, appendChild: () => {} },
   createElement: () => ({
     setAttribute: () => {},
@@ -378,6 +408,7 @@ assert.deepEqual(
 const noLayoutCtx = makeCtx()
 delete noLayoutCtx.layout
 module.apply(noLayoutCtx)
+const noLayoutPanel = registrations[registrations.length - 2]
 const noLayoutCapsule = registrations[registrations.length - 1]
 const noLayoutInjected = noLayoutCapsule.options.inject()
 const noLayoutButton = findButton(
@@ -575,6 +606,94 @@ try {
 } finally {
   delete globalThis.fetch
 }
+
+/**
+ * A dropped connection, and the way back. The account read fails once — the
+ * platform reports that as `status: "failed"` / a thrown call — the capsule says
+ * why, the next attempt is scheduled sooner than the normal interval, and the
+ * moment the browser reports the network back the plugin retries at once instead
+ * of waiting the interval out.
+ */
+let flakyCall = 0
+const flakyCtx = makeCtx({
+  remote: {
+    account: {
+      getBalance: async (meta) => {
+        balanceCalls.push(meta)
+        flakyCall += 1
+        if (flakyCall === 1) throw new Error('offline')
+        return {
+          ok: true,
+          value: { status: 'ready', value: [{ currency: 'CNY', balance: '30.00' }], bonusWallets: [] },
+        }
+      },
+    },
+  },
+})
+module.apply(flakyCtx)
+const flakyCapsule = registrations[registrations.length - 1]
+const flakyInjected = flakyCapsule.options.inject()
+const timersBeforeFlaky = timerSeq
+renderEntry(flakyCapsule, flakyInjected, 'flaky')
+await new Promise((resolve) => {
+  setTimeout(resolve, 0)
+})
+const afterFailure = renderEntry(flakyCapsule, flakyInjected, 'flaky')
+assert.match(afterFailure, /zh:reasonCallFailed/, 'a thrown account read is reported on the capsule')
+// Timers are selected by id, not by array index: `clearTimeout` splices entries
+// out, so any index recorded earlier points at the wrong row afterwards.
+assert.ok(
+  timers.some((row) => row.id > timersBeforeFlaky && row.delay === 15000),
+  'a failed read retries sooner than the normal interval',
+)
+
+const callsBeforeOnline = balanceCalls.length
+const timersBeforeOnline = timerSeq
+fire('window', 'online')
+await new Promise((resolve) => {
+  setTimeout(resolve, 0)
+})
+// The harness shares one listener table across every scenario and re-runs effects
+// on each render (React would have cleaned the previous one up), so one event
+// reaches several listener instances. What matters is that the event reads
+// immediately — not on the timer — and that a read that succeeds goes back to the
+// normal cadence.
+assert.ok(
+  balanceCalls.length > callsBeforeOnline,
+  `coming online triggers a read at once (${String(callsBeforeOnline)} -> ${String(balanceCalls.length)})`,
+)
+const afterOnline = renderEntry(flakyCapsule, flakyInjected, 'flaky')
+assert.match(afterOnline, /¥30\.00/, 'the balance appears once the connection is back')
+assert.equal(/zh:reasonCallFailed/.test(afterOnline), false, 'the failure note clears itself')
+assert.ok(
+  timers.some((row) => row.id > timersBeforeOnline && row.delay === 60000),
+  'a successful read returns to the normal interval',
+)
+
+/**
+ * The panel's close control returns the shell to the conversation, and it only
+ * exists when the layout service does — a button that cannot close anything is
+ * worse than no button.
+ */
+const closePanelEntry = registrations[registrations.length - 2]
+const closePanelInjected = closePanelEntry.options.inject()
+const closePanelText = renderEntry(closePanelEntry, closePanelInjected, 'close-panel')
+assert.match(closePanelText, /✕/, 'the panel carries a close control')
+const closeButton = findButton(
+  { type: closePanelEntry.component, props: {}, children: [] },
+  closePanelInjected,
+  'close-panel',
+)
+assert.equal(closeButton.props['aria-label'], 'zh:close', 'the close control is labelled for the active locale')
+closeButton.props.onClick()
+assert.deepEqual(openedPanels, ['peak-bar', null], 'closing asks the shell for the conversation')
+
+// Without the layout service there is nothing to close, so no control is drawn.
+assert.equal(
+  renderEntry(noLayoutPanel, noLayoutPanel.options.inject(), 'no-layout-panel').includes('✕'),
+  false,
+  'no close control without the layout service',
+)
 
 /**
  * A throw inside `apply` must not take the capsule away silently: the guard

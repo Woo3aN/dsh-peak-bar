@@ -57,6 +57,12 @@ window.__ModuleLoader__.load({
     const LOCALE_NS = 'peakBar'
     /** Balance re-read interval; the account read itself is cached for 25s. */
     const BALANCE_REFRESH_MS = 60000
+    /**
+     * Re-read interval used while the last read failed. A dropped connection used
+     * to leave the failure on screen for up to a minute; the account read is
+     * cached for 25s, so trying sooner than this costs nothing.
+     */
+    const BALANCE_RETRY_MS = 15000
     /** One-second clock is enough: the capsule shows mm:ss. */
     const CLOCK_MS = 1000
 
@@ -627,6 +633,37 @@ window.__ModuleLoader__.load({
       return ''
     }
 
+    /**
+     * The panel's close control. The shell documents `layout.selectPanel(null)`
+     * as "return to the Conversation", which is exactly this. It is rendered only
+     * when the layout service is available — without it there is nothing to close,
+     * and a button that does nothing is worse than none.
+     *
+     * @param props - this plugin's injected data.
+     * @returns the button, or null without the layout service.
+     */
+    function panelClose(props) {
+      const scope = props.layoutScope()
+      if (scope === null) return null
+      const close = () => {
+        try {
+          const layout = scope.layout
+          if (layout && typeof layout.selectPanel === 'function') layout.selectPanel(null)
+        } catch (error) {
+          if (typeof console !== 'undefined' && typeof console.error === 'function') {
+            console.error('[dsh-peak-bar] closing the details panel failed', error)
+          }
+        }
+      }
+      return h('button', {
+        type: 'button',
+        className: 'dshPeakBarPanel__close',
+        title: props.closeLabel,
+        'aria-label': props.closeLabel,
+        onClick: close,
+      }, '✕')
+    }
+
     function StatusPanel(props) {
       const status = useStatus(props)
       const source = spendSourceText(props, status.spentSource)
@@ -635,7 +672,8 @@ window.__ModuleLoader__.load({
       return h('div', { className: 'dshPeakBarPanel' },
         h('div', { className: 'dshPeakBarPanel__head' },
           h('span', { className: status.valley ? 'dshPeakBarPanel__tag' : 'dshPeakBarPanel__tag dshPeakBarPanel__tag--peak' }, status.label),
-          h('span', { className: 'dshPeakBarPanel__title' }, props.titleLabel)),
+          h('span', { className: 'dshPeakBarPanel__title' }, props.titleLabel),
+          panelClose(props)),
         h('dl', { className: 'dshPeakBarPanel__rows' },
           h('dt', null, props.nextLabel),
           h('dd', null, status.remaining === '' ? '—' : status.remaining),
@@ -693,47 +731,76 @@ window.__ModuleLoader__.load({
             .catch(() => {})
         }
         prime()
-        const tick = () => {
+        /**
+         * One read. Resolves to whether a balance actually arrived, which decides
+         * how soon the next attempt is scheduled.
+         */
+        const readOnce = () => Promise.resolve()
+          .then(() => readBalance(props.ctx, accountScope(), props.reasons, {
+            keyFailed: props.keyFailed,
+            keyUnavailable: props.keyUnavailable,
+          }))
+          .then((answer) => {
+            if (disposed) return false
+            // A failed read keeps the last known amount on screen, like the
+            // other balance surfaces do; only the note changes.
+            if (answer.text !== null) setBalance(answer.text)
+            setBalanceSource(typeof answer.source === 'string' ? answer.source : '')
+            setBalanceNote(answer.note)
+            // The ledger round trip runs after the readout is on screen: a slow
+            // or unreachable Host must not hold back the balance.
+            if (answer.total) {
+              Promise.resolve()
+                .then(() => recordSpend(answer.total))
+                .then((result) => {
+                  if (disposed || result === null) return
+                  if (typeof result.text === 'string') setSpent(result.text)
+                  setSpentSource(typeof result.source === 'string' ? result.source : '')
+                })
+                .catch(() => {})
+            }
+            return answer.text !== null
+          })
+          .catch((error) => {
+            if (!disposed) setBalanceNote(fill(props.reasons.readError, { detail: errText(error) }))
+            return false
+          })
+
+        let timer = 0
+        /**
+         * Read, then schedule the next attempt at the cadence the last one
+         * earned: the normal interval after a success, a shorter one after a
+         * failure, so a dropped connection is noticed and repaired quickly
+         * instead of leaving the failure on screen for a minute.
+         */
+        const cycle = () => {
           if (disposed) return
-          Promise.resolve()
-            .then(() => readBalance(props.ctx, accountScope(), props.reasons, {
-              keyFailed: props.keyFailed,
-              keyUnavailable: props.keyUnavailable,
-            }))
-            .then((answer) => {
-              if (disposed) return
-              // A failed read keeps the last known amount on screen, like the
-              // other balance surfaces do; only the note changes.
-              if (answer.text !== null) setBalance(answer.text)
-              setBalanceSource(typeof answer.source === 'string' ? answer.source : '')
-              setBalanceNote(answer.note)
-              // The ledger round trip runs after the readout is on screen: a slow
-              // or unreachable Host must not hold back the balance.
-              if (answer.total) {
-                Promise.resolve()
-                  .then(() => recordSpend(answer.total))
-                  .then((result) => {
-                    if (disposed || result === null) return
-                    if (typeof result.text === 'string') setSpent(result.text)
-                    setSpentSource(typeof result.source === 'string' ? result.source : '')
-                  })
-                  .catch(() => {})
-              }
+          readOnce()
+            .then((ok) => {
+              if (!disposed) timer = window.setTimeout(cycle, ok ? BALANCE_REFRESH_MS : BALANCE_RETRY_MS)
             })
-            .catch((error) => {
-              if (disposed) return
-              setBalanceNote(fill(props.reasons.readError, { detail: errText(error) }))
+            .catch(() => {
+              if (!disposed) timer = window.setTimeout(cycle, BALANCE_RETRY_MS)
             })
         }
-        tick()
-        const timer = window.setInterval(tick, BALANCE_REFRESH_MS)
+        /** Read now, because something outside says the conditions changed. */
+        const wake = () => {
+          if (disposed) return
+          window.clearTimeout(timer)
+          cycle()
+        }
+        cycle()
+        // Coming back online, or back to the window, is the moment a failed read
+        // is most likely to succeed, so neither waits for the next timer.
         const onVisible = () => {
-          if (document.visibilityState === 'visible') tick()
+          if (document.visibilityState === 'visible') wake()
         }
+        window.addEventListener('online', wake)
         document.addEventListener('visibilitychange', onVisible)
         return () => {
           disposed = true
-          window.clearInterval(timer)
+          window.clearTimeout(timer)
+          window.removeEventListener('online', wake)
           document.removeEventListener('visibilitychange', onVisible)
         }
       }, [props.ctx])
@@ -918,7 +985,10 @@ window.__ModuleLoader__.load({
      */
     const PANEL_CSS = [
       '.dshPeakBarPanel{padding:18px 20px;max-width:520px;color:var(--dsw-alias-label-primary)}',
-      '.dshPeakBarPanel__head{display:flex;align-items:baseline;gap:8px;margin-bottom:12px}',
+      '.dshPeakBarPanel__head{display:flex;align-items:center;gap:8px;margin-bottom:12px}',
+      '.dshPeakBarPanel__close{margin-left:auto;border:0;background:none;padding:2px 6px;border-radius:6px;cursor:pointer;',
+      'color:var(--dsw-alias-label-tertiary);font:inherit;line-height:1}',
+      '.dshPeakBarPanel__close:hover{color:var(--dsw-alias-label-primary)}',
       '.dshPeakBarPanel__tag{font-weight:600;color:var(--dsh-peak-bar-offpeak,var(--dsw-alias-state-success-primary,var(--dsw-alias-label-secondary)))}',
       '.dshPeakBarPanel__tag--peak{color:var(--dsh-peak-bar-peak,var(--dsw-alias-brand-primary))}',
       '.dshPeakBarPanel__title{color:var(--dsw-alias-label-tertiary)}',
@@ -953,6 +1023,7 @@ window.__ModuleLoader__.load({
         spentHint: '“今日已用”按余额减少观测累计（充值/赠金不计入）。账本由 Host 写入 $DSH_HOME，跨重启保留；Host 不可用时退回本次运行统计。',
         clickHint: '点击查看详情',
         panelUnavailable: '详情面板暂不可用',
+        close: '关闭（返回对话）',
         reasonNoRemote: '账号 Remote 不可用（{detail}）',
         reasonCallFailed: '账号接口调用失败：{detail}',
         reasonNotReady: '账号未就绪（status={status}）',
@@ -983,6 +1054,7 @@ window.__ModuleLoader__.load({
         spentHint: '"Spent today" accumulates the drops between balance readings (top-ups and granted credit are not counted). The ledger lives in $DSH_HOME, written by the Host half, so it survives restarts; when the Host is unavailable the capsule falls back to counting this run only.',
         clickHint: 'click for details',
         panelUnavailable: 'the details panel is unavailable',
+        close: 'Close (back to the conversation)',
         reasonNoRemote: 'account Remote unavailable ({detail})',
         reasonCallFailed: 'account call failed: {detail}',
         reasonNotReady: 'account not ready (status={status})',
@@ -1142,6 +1214,7 @@ window.__ModuleLoader__.load({
         spentHint: t('spentHint'),
         clickHint: t('clickHint'),
         panelUnavailable: t('panelUnavailable'),
+        closeLabel: t('close'),
         countdownFormats: { long: t('countdownLong'), short: t('countdownShort') },
         reasons: {
           noRemote: t('reasonNoRemote'),

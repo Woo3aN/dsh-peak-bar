@@ -8,7 +8,7 @@ One small capsule centred in the window title bar: it shows the DeepSeek API pea
 
 ## What it looks like, and where it sits
 
-<!-- Screenshot: the capsule in the title bar (to be added) -->
+![The capsule in the title bar, on the default skin: the billing window, its countdown, the balance and today's spend](docs/capsule.png)
 
 The capsule shows whether the current window is peak or off-peak, the countdown to the next switch, and the account balance; the countdown is accurate to the second. Clicking the capsule opens a details panel in the main area with the peak/off-peak state, the countdown to the next switch, the balance, and an explanation of the billing rules; **the ✕ in its top-right corner returns to the conversation**.
 
@@ -22,9 +22,11 @@ A failed read is never silent:
 
 While reads are failing the retry backs off — **15s, then 30s, then 60s** — so a short blip is repaired at once without knocking on the platform all day; when the browser reports the network back (`online`) or the window becomes visible again the plugin retries at once, so a real outage still repairs itself within seconds.
 
-The capsule sits in the middle of the window title bar, on the same row as the minimize and close buttons on Windows as well.
+The capsule lands on the window's top row — on Windows that is the same row as the minimize / close buttons, to their left (no overlap, nothing covered).
 
-Why the title bar: DSH's window chrome seat `shell.leading` is mounted only on macOS with the sidebar collapsed, and Windows has no title-bar slot. This plugin registers into `shell.overlay` — the root frame's overlay layer, `inset:0` over the padding box that contains the title bar — so it lands on the title-bar row on Windows too. Centring is deliberate: the shell publishes `--dsh-windows-titlebar-height` and `--dsh-windows-menu-start` but no width for the native button cluster, so right alignment would need a hard-coded inset.
+Why the title bar: DSH's window chrome seat `shell.leading` is mounted only on macOS with the sidebar collapsed, and Windows has no title-bar slot. This plugin registers into `shell.overlay` — the root frame's overlay layer, `inset:0` over the padding box that contains the title bar — so it lands on the title-bar row on Windows too.
+
+The seat asks for the centre with `left:50%` + `translateX(-50%)`. **Measured**: in a 1423px-wide window the capsule's centre sits at about 73%, not 50% (measurable in `docs/capsule.png`), so this overlay's containing block is narrower than the window and not left-aligned. The README describes where it lands (same row, left of the buttons) and does not explain the mechanism; for a strict centre or a flush-right seat, skip the `--dsh-peak-bar-*` colours and position it yourself — see the end of the colours section.
 
 The capsule is `position:absolute` and the seat is `pointer-events:none`; only the capsule itself is clickable and it sets `-webkit-app-region:no-drag`, so the rest of the title bar still drags the window.
 
@@ -169,6 +171,18 @@ Anything you leave out keeps following the skin. **Always give a skin token a li
   --dsh-peak-bar-peak: #35e0d0;
   --dsh-peak-bar-countdown: #7fd7d0;
 }
+```
+
+## Position
+
+Where the capsule lands is decided by the shell's `shell.overlay` layer (see the measurement under "What it looks like, and where it sits"). To pin it yourself, override the seat's positioning — **the class names are not a public contract and may change, so verify after an update**:
+
+```css
+/* a true window centre: a fixed box is positioned against the viewport, not the overlay's box */
+.dshPeakBarSeat { position: fixed; left: 50%; right: auto; transform: translateX(-50%) }
+
+/* or flush against the window buttons: 132px is their width at 100% scaling, and it changes with it */
+.dshPeakBarSeat { position: absolute; left: auto; right: 132px; transform: none }
 ```
 
 ## Known limitations

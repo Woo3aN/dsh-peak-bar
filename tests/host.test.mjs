@@ -29,7 +29,7 @@ import { Readable } from 'node:stream'
 import test, { after } from 'node:test'
 
 /** The run's home; every test gets a fresh case directory underneath it. */
-const homeRoot = mkdtempSync(join(tmpdir(), 'rhine-host-'))
+const homeRoot = mkdtempSync(join(tmpdir(), 'peak-bar-host-'))
 
 // Set BEFORE ../index.js is loaded, so the module can never resolve the real
 // ~/.dsh: the ledger path is resolved per request, not at import, but the order
@@ -43,7 +43,7 @@ after(() => {
 const host = await import('../index.js')
 
 /** Ledger file name under DSH_HOME; the frozen storage contract. */
-const LEDGER_NAME = '.dsh-rhine-statusbar.json'
+const LEDGER_NAME = '.dsh-peak-bar.json'
 /** The day and instant used by most of the cases below. */
 const DAY = '2026-10-09'
 const AT = '2026-10-09T05:33:12.000Z'
@@ -213,10 +213,10 @@ function balancePayload(total = '20.79', currency = 'CNY', available) {
 function openBalance(t, options = {}) {
   useCredentials(t, options.key ?? 'test-key')
   useBalanceFetch(t, options)
-  process.env.DSH_RHINE_BALANCE_URL = options.url ?? 'https://balance.test/user/balance'
+  process.env.DSH_PEAK_BAR_BALANCE_URL = options.url ?? 'https://balance.test/user/balance'
   host.testing.resetBalanceCache()
   t.after(() => {
-    delete process.env.DSH_RHINE_BALANCE_URL
+    delete process.env.DSH_PEAK_BAR_BALANCE_URL
     host.testing.resetBalanceCache()
   })
 }
@@ -243,7 +243,7 @@ function storedLedger(home) {
 }
 
 test('apply registers the spend route through the optional webServer injection', () => {
-  assert.equal(host.name, 'rhine-statusbar')
+  assert.equal(host.name, 'peak-bar')
   // Both services are optional and scoped to the one callback: the ledger route
   // needs only the carrier, and the balance route degrades to `no-key` without a
   // credentials service rather than keeping the plugin from loading.
@@ -598,10 +598,10 @@ test('an unreadable balance answer is refused rather than guessed at', async (t)
   ]
   const credentials = useCredentials(t, 'test-key')
   t.after(() => {
-    delete process.env.DSH_RHINE_BALANCE_URL
+    delete process.env.DSH_PEAK_BAR_BALANCE_URL
     host.testing.resetBalanceCache()
   })
-  process.env.DSH_RHINE_BALANCE_URL = 'https://balance.test/user/balance'
+  process.env.DSH_PEAK_BAR_BALANCE_URL = 'https://balance.test/user/balance'
   balanceCalls.length = 0
   // The answer changes every iteration, so the stub is rebuilt around the current
   // one instead of the single fixed answer `openBalance` installs.
@@ -646,10 +646,10 @@ test('a failure is not cached, so the next request retries at once', async (t) =
   const credentials = useCredentials(t, 'test-key')
   const state = useBalanceFetch(t, { ok: false, status: 503 })
   t.after(() => {
-    delete process.env.DSH_RHINE_BALANCE_URL
+    delete process.env.DSH_PEAK_BAR_BALANCE_URL
     host.testing.resetBalanceCache()
   })
-  process.env.DSH_RHINE_BALANCE_URL = 'https://balance.test/user/balance'
+  process.env.DSH_PEAK_BAR_BALANCE_URL = 'https://balance.test/user/balance'
   host.testing.resetBalanceCache()
   assert.equal(payload(await call(balanceRoute, 'GET')).ok, false)
   state.ok = true

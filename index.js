@@ -1,5 +1,5 @@
 /**
- * Host half of dsh-rhine-statusbar.
+ * Host half of dsh-peak-bar.
  *
  * The capsule is browser-side (./client.js), but its "spent today" figure cannot
  * be: a drop in a balance is only meaningful against the previous reading, and
@@ -32,7 +32,7 @@
  *     HTTP carrier still loads this plugin — the page then falls back to its own
  *     per-run tally.
  *
- * @module dsh-rhine-statusbar
+ * @module dsh-peak-bar
  */
 
 import { randomBytes } from 'node:crypto'
@@ -41,10 +41,10 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
 /** The cordis plugin name; it matches this plugin's row id in cordis.patch.yml. */
-export const name = 'rhine-statusbar'
+export const name = 'peak-bar'
 
 /** The single path both verbs are served from; the method selects the behaviour. */
-const ROUTE = '/dsh-rhine-statusbar/spend'
+const ROUTE = '/dsh-peak-bar/spend'
 
 /**
  * The read-only balance path, served by GET alone.
@@ -55,13 +55,13 @@ const ROUTE = '/dsh-rhine-statusbar/spend'
  * holds. A walled-off key reader also means the official endpoint is reached from
  * exactly one place, with exactly one cache in front of it.
  */
-const BALANCE_ROUTE = '/dsh-rhine-statusbar/balance'
+const BALANCE_ROUTE = '/dsh-peak-bar/balance'
 
 /** Where the official balance endpoint lives when nothing overrides it. */
 const BALANCE_API = 'https://api.deepseek.com/user/balance'
 
 /** The env override read on every request, so a test can point it at a stub. */
-const BALANCE_URL_ENV = 'DSH_RHINE_BALANCE_URL'
+const BALANCE_URL_ENV = 'DSH_PEAK_BAR_BALANCE_URL'
 
 /** The env key the credentials service is asked to resolve. */
 const BALANCE_KEY_ENV = 'DEEPSEEK_API_KEY'
@@ -73,7 +73,7 @@ const BALANCE_CACHE_MS = 25000
 const BALANCE_TIMEOUT_MS = 8000
 
 /** Ledger file name under DSH_HOME. */
-const LEDGER_FILE = '.dsh-rhine-statusbar.json'
+const LEDGER_FILE = '.dsh-peak-bar.json'
 
 /** Ledger format version. A file declaring another one is treated as unusable. */
 const LEDGER_VERSION = 1
@@ -106,7 +106,7 @@ const LOOPBACK_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '::1'])
  * a profile that moves its home, point `DSH_HOME` somewhere else and have the very
  * next request follow it.
  *
- * @returns the absolute path of `<DSH_HOME>/.dsh-rhine-statusbar.json`.
+ * @returns the absolute path of `<DSH_HOME>/.dsh-peak-bar.json`.
  */
 function ledgerPath() {
   const home = process.env.DSH_HOME || join(homedir(), '.dsh')
@@ -564,7 +564,7 @@ async function fetchBalance(credentials) {
 }
 
 /**
- * `GET /dsh-rhine-statusbar/balance` -> the account balance behind the API key.
+ * `GET /dsh-peak-bar/balance` -> the account balance behind the API key.
  *
  * The fence and the method check answer 403 and 405 as they do on the ledger
  * route; everything past them answers 200, with `ok` carrying the verdict, because
@@ -615,7 +615,7 @@ async function readBody(req) {
 }
 
 /**
- * `GET /dsh-rhine-statusbar/spend` -> the ledger's most recent day.
+ * `GET /dsh-peak-bar/spend` -> the ledger's most recent day.
  *
  * The day answered is the one the last observation named, not a calendar this
  * process derives: the page owns the billing day, so the host reports the newest
@@ -650,7 +650,7 @@ async function readHandler(req, res) {
 }
 
 /**
- * `POST /dsh-rhine-statusbar/spend` -> fold one reading into the ledger.
+ * `POST /dsh-peak-bar/spend` -> fold one reading into the ledger.
  *
  * Answers 400 for a body that is not a usable reading, 403 for a request the
  * fence refuses, 500 when the fold could not be persisted, and 200 with the day's
@@ -732,7 +732,7 @@ async function spendHandler(req, res) {
 function mountRoute(webCtx, path, handler) {
   webCtx.effect(
     () => webCtx.webServer.register({ kind: 'exact', path, handler }),
-    `rhine-statusbar: ${path}`,
+    `peak-bar: ${path}`,
   )
 }
 

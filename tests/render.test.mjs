@@ -145,8 +145,8 @@ const fakeCtx = makeCtx()
 module.apply(fakeCtx)
 
 assert.deepEqual(registrations.map((row) => row.options.name), ['main', 'shell.overlay'])
-assert.equal(registrations[0].options.key, 'rhine-statusbar')
-assert.equal(registrations[1].options.id, 'rhine-statusbar')
+assert.equal(registrations[0].options.key, 'peak-bar')
+assert.equal(registrations[1].options.id, 'peak-bar')
 assert.equal(registrations[1].options.order, 10)
 
 /**
@@ -284,7 +284,7 @@ assert.match(bareText, /zh:peakOn|zh:peakOff/, 'the countdown still renders with
  * Localisation: both dictionaries must carry the same keys, so a new string
  * cannot ship translated in one language only.
  */
-const table = dictionaries.statusbarRhine
+const table = dictionaries.peakBar
 assert.ok(table !== undefined, 'the dictionaries were registered')
 assert.deepEqual(
   Object.keys(table.zh).sort(),
@@ -330,7 +330,7 @@ const button = findButton({ type: registrations[1].component, props: {}, childre
 assert.ok(button !== null, 'the capsule renders a button')
 assert.equal(typeof button.props.onClick, 'function')
 button.props.onClick()
-assert.deepEqual(opened, ['rhine-statusbar'], 'the capsule opens the status panel')
+assert.deepEqual(opened, ['peak-bar'], 'the capsule opens the status panel')
 
 /**
  * The tooltip must not blink. A native `title` tooltip is torn down whenever its
@@ -425,7 +425,7 @@ try {
   const hostText = renderEntry(hostCapsule, hostInjected, 'host-spend')
   assert.match(hostText, /¥7\.50/, 'the Host ledger total is what the capsule shows')
   assert.ok(observed.length > 0, 'the plugin posted an observation to the Host ledger')
-  assert.match(observed[0].url, /\/dsh-rhine-statusbar\/spend$/, 'the observation goes to the ledger route')
+  assert.match(observed[0].url, /\/dsh-peak-bar\/spend$/, 'the observation goes to the ledger route')
   assert.match(observed[0].body.day, /^\d{4}-\d{2}-\d{2}$/, 'the observation names the Beijing day')
   assert.match(observed[0].body.currency, /^[A-Z]{3}$/, 'the observation names the currency')
   assert.equal(typeof observed[0].body.amount, 'number', 'the observation carries the balance amount')
@@ -450,7 +450,7 @@ try {
  * is served by the Host's balance route, and the panel must say so.
  */
 globalThis.fetch = async (url, init = {}) => {
-  if (String(url).includes('/dsh-rhine-statusbar/balance')) {
+  if (String(url).includes('/dsh-peak-bar/balance')) {
     return { ok: true, status: 200, json: async () => ({ ok: true, balance: '20.79', currency: 'CNY', source: 'apikey' }) }
   }
   if (init.method === 'POST') {
@@ -496,7 +496,7 @@ module.apply(makeCtx({
   },
 }))
 const failure = registrations[registrations.length - 1]
-assert.equal(failure.options.id, 'rhine-statusbar-failure', 'the failure entry is registered')
+assert.equal(failure.options.id, 'peak-bar-failure', 'the failure entry is registered')
 assert.match(
   renderEntry(failure, {}, 'failure'),
   /峰谷·余额加载失败/,
@@ -557,9 +557,9 @@ assert.equal(
   (css.match(/\}/g) ?? []).length,
   'stylesheet braces balance',
 )
-assert.match(css, /\.dshRhineStatusSeat\{/)
+assert.match(css, /\.dshPeakBarSeat\{/)
 assert.match(css, /var\(--dsh-windows-titlebar-height/)
-assert.equal(/dshRhineStatusRow/.test(css), false, 'the sidebar row styles are gone')
+assert.equal(/dshPeakBarRow/.test(css), false, 'the sidebar row styles are gone')
 
 /**
  * Following the skin is the default, so every colour `var()` must fall back to a
@@ -567,7 +567,7 @@ assert.equal(/dshRhineStatusRow/.test(css), false, 'the sidebar row styles are g
  *
  * The fallbacks must sit **at the use site** and no rule of ours may declare the
  * variables themselves: the theme projects `--dsw-alias-*` inline on `body`, so a
- * `--dsh-rhine-*` declared on `html` would be resolved where those tokens do not
+ * `--dsh-peak-bar-*` declared on `html` would be resolved where those tokens do not
  * exist yet and would come out invalid — which is exactly how the capsule once
  * lost its border. Declaring nothing also leaves every override (a skin, a custom
  * stylesheet, `:root`, `body`) winning with no specificity fight.
@@ -576,30 +576,30 @@ const COLOUR_VARS = [
   'bg', 'bg-hover', 'border', 'text', 'offpeak', 'peak', 'countdown', 'label', 'spent', 'note',
 ]
 for (const name of COLOUR_VARS) {
-  const marker = `var(--dsh-rhine-${name},`
+  const marker = `var(--dsh-peak-bar-${name},`
   const at = css.indexOf(marker)
-  assert.ok(at >= 0, `--dsh-rhine-${name} is read with a fallback`)
+  assert.ok(at >= 0, `--dsh-peak-bar-${name} is read with a fallback`)
   // Nested fallbacks are allowed (a success token with a neutral backstop), so
   // this checks the shape of the fallback head rather than matching one level of
   // parentheses.
   assert.match(
     css.slice(at, at + marker.length + 60),
-    new RegExp(`^var\\(--dsh-rhine-${name},var\\(--dsw-`),
-    `--dsh-rhine-${name} falls back to a theme token, so the capsule follows the skin`,
+    new RegExp(`^var\\(--dsh-peak-bar-${name},var\\(--dsw-`),
+    `--dsh-peak-bar-${name} falls back to a theme token, so the capsule follows the skin`,
   )
 }
 assert.equal(
-  /--dsh-rhine-[a-z-]+\s*:/.test(css),
+  /--dsh-peak-bar-[a-z-]+\s*:/.test(css),
   false,
   'the plugin declares none of its own variables, so any override wins',
 )
-assert.match(css, /var\(--dsh-rhine-radius,999px\)/, 'the corner radius is themeable')
+assert.match(css, /var\(--dsh-peak-bar-radius,999px\)/, 'the corner radius is themeable')
 assert.match(
   css,
-  /var\(--dsh-rhine-offpeak,var\(--dsw-alias-state-success-primary/,
+  /var\(--dsh-peak-bar-offpeak,var\(--dsw-alias-state-success-primary/,
   'off-peak reads as the theme success colour, with a neutral backstop',
 )
-assert.match(css, /var\(--dsh-rhine-font-size,12px\)/, 'the font size is themeable')
+assert.match(css, /var\(--dsh-peak-bar-font-size,12px\)/, 'the font size is themeable')
 assert.match(css, /var\(--ds-transition-duration/, 'motion follows the theme duration token')
 assert.match(css, /prefers-reduced-motion/, 'reduced motion is honoured')
 assert.equal(

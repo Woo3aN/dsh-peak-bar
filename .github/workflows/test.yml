@@ -34,7 +34,7 @@ jobs:
         env:
           # The host test drives its own temporary DSH_HOME, but make sure no
           # real credential or ledger path leaks in from the runner.
-          DSH_HOME: ${{ runner.temp }}/dsh-rhine-ci
+          DSH_HOME: ${{ runner.temp }}/dsh-peak-bar-ci
 
       - name: Pack (verifies the published file list)
         run: npm pack --dry-run

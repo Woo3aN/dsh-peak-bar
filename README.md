@@ -1,6 +1,6 @@
-# dsh-rhine-statusbar
+# dsh-peak-bar
 
-窗口标题栏正中一枚小胶囊：显示 DeepSeek API 的峰谷计费时段和账户余额，点击胶囊在主区域打开详情面板，读取失败时把失败原因直接写在胶囊上。
+窗口标题栏正中一枚小胶囊：显示 DeepSeek API 的峰谷计费时段、账户余额与今日已用，点击胶囊在主区域打开详情面板，读取失败时把失败原因直接写在胶囊上。颜色跟随当前皮肤，也可以自己覆盖。
 
 - 版本：0.3.0
 - 许可：MIT
@@ -57,7 +57,7 @@ dsh plugin --profile web add "<本目录绝对路径或包名>"
 余额有**两条路**，按顺序尝试：
 
 1. **账号登录态**：`ctx.remote.account.getBalance()`，和 DSH 自带“账号与余额”设置卡片同一条路。返回值是两层的：`{ok, value}`，其中 `value` 是 `{status, value: 充值钱包[], bonusWallets: 赠金钱包[]}`。余额 = 充值 + 赠金，多币种分别显示，并用 ` + ` 连接。
-2. **API key**：账号路拿不到时（没登录、登录态失效、账号接口未就绪），改问 Host 半的 `/dsh-rhine-statusbar/balance`。Host 从 DSH 凭据服务解析 `DEEPSEEK_API_KEY`，直连官方 `GET https://api.deepseek.com/user/balance` 并只回传 `total_balance` 与币种。**密钥不出 Host、也不会发给除官方端点以外的任何地方。**
+2. **API key**：账号路拿不到时（没登录、登录态失效、账号接口未就绪），改问 Host 半的 `/dsh-peak-bar/balance`。Host 从 DSH 凭据服务解析 `DEEPSEEK_API_KEY`，直连官方 `GET https://api.deepseek.com/user/balance` 并只回传 `total_balance` 与币种。**密钥不出 Host、也不会发给除官方端点以外的任何地方。**
 
 两条路口径一致（都是充值 + 赠金），所以“今日已用”的差额记账在切路时仍然正确。面板里会写明这次余额来自哪条路（`余额来源：DeepSeek 账号登录 / API key`）。
 
@@ -67,7 +67,7 @@ dsh plugin --profile web add "<本目录绝对路径或包名>"
 
 账号接口给的是**余额**，不是账单，所以“今日已用”是按**余额下降**观测累计出来的：两次读取之间余额下降的差额算消费，余额上升（充值 / 赠金）不计入、也不会把已记的消费抹掉。按**北京时间日**分账，和官方计费日一致。
 
-账本由 **Host 半**写在 `<DSH_HOME>/.dsh-rhine-statusbar.json`（默认 `~/.dsh/`）。放 Host 而不是放页面里，是因为桌面端每次启动的端口可能不同——端口一变，页面 origin 就变，`localStorage` 会被清空。文件里只保留最近 14 天的日汇总，写入是原子的（临时文件 + rename），文件损坏时当作空账本继续，不会影响插件运行。
+账本由 **Host 半**写在 `<DSH_HOME>/.dsh-peak-bar.json`（默认 `~/.dsh/`）。放 Host 而不是放页面里，是因为桌面端每次启动的端口可能不同——端口一变，页面 origin 就变，`localStorage` 会被清空。文件里只保留最近 14 天的日汇总，写入是原子的（临时文件 + rename），文件损坏时当作空账本继续，不会影响插件运行。
 
 Host 路由不可用时（例如没有 HTTP 载体的 profile），胶囊退回"本次运行统计"，并继续正常显示峰谷与余额——丢的是历史，不是功能。
 
@@ -81,22 +81,22 @@ Host 路由不可用时（例如没有 HTTP 载体的 profile），胶囊退回"
 
 ## 自定义颜色
 
-本插件**不声明** `--dsh-rhine-*` 自身，只在用到的地方写成 `var(--dsh-rhine-x, 主题 token)`。这一点是刻意的：主题把 `--dsw-alias-*` 以内联变量挂在 **`body`** 上，若把 `--dsh-rhine-x` 声明在 `html` 上，它就会在"那些 token 还不存在"的元素上求值而变成非法值——边框这种没有 fallback 的属性会直接消失（早期版本正是这样丢掉描边的）。写在使用处则由那枚按钮求值，能看见 body 上的 token。也正因我们不声明任何变量，**任何覆盖都直接生效**：皮肤的 `skin.css`、自定义样式表、`:root`、`body`、胶囊元素本身，都不必和本文件比优先级。
+本插件**不声明** `--dsh-peak-bar-*` 自身，只在用到的地方写成 `var(--dsh-peak-bar-x, 主题 token)`。这一点是刻意的：主题把 `--dsw-alias-*` 以内联变量挂在 **`body`** 上，若把 `--dsh-peak-bar-x` 声明在 `html` 上，它就会在"那些 token 还不存在"的元素上求值而变成非法值——边框这种没有 fallback 的属性会直接消失（早期版本正是这样丢掉描边的）。写在使用处则由那枚按钮求值，能看见 body 上的 token。也正因我们不声明任何变量，**任何覆盖都直接生效**：皮肤的 `skin.css`、自定义样式表、`:root`、`body`、胶囊元素本身，都不必和本文件比优先级。
 
 | 变量 | 作用 | 默认值 |
 |---|---|---|
-| `--dsh-rhine-bg` | 胶囊底色 | `var(--dsw-alias-button-elevated-fill, transparent)` |
-| `--dsh-rhine-bg-hover` | 悬停底色 | `var(--dsw-alias-button-floating-hover)` |
-| `--dsh-rhine-border` | 描边 | `var(--dsw-alias-border-l2)` |
-| `--dsh-rhine-text` | 金额等主文字 | `var(--dsw-alias-label-primary)` |
-| `--dsh-rhine-offpeak` | "谷时"标签（取主题的成功色，即绿色） | `var(--dsw-alias-state-success-primary, var(--dsw-alias-label-secondary))` |
-| `--dsh-rhine-peak` | "高峰"标签 | `var(--dsw-alias-brand-primary)` |
-| `--dsh-rhine-countdown` | 倒计时数字 | `var(--dsw-alias-label-tertiary)` |
-| `--dsh-rhine-label` | “余额 / 今日已用”标签 | `var(--dsw-alias-label-tertiary)` |
-| `--dsh-rhine-spent` | 今日已用金额 | `var(--dsw-alias-label-secondary)` |
-| `--dsh-rhine-note` | 失败原因文字 | `var(--dsw-alias-label-tertiary)` |
-| `--dsh-rhine-radius` | 圆角 | `999px` |
-| `--dsh-rhine-font-size` | 字号 | `12px` |
+| `--dsh-peak-bar-bg` | 胶囊底色 | `var(--dsw-alias-button-elevated-fill, transparent)` |
+| `--dsh-peak-bar-bg-hover` | 悬停底色 | `var(--dsw-alias-button-floating-hover)` |
+| `--dsh-peak-bar-border` | 描边 | `var(--dsw-alias-border-l2)` |
+| `--dsh-peak-bar-text` | 金额等主文字 | `var(--dsw-alias-label-primary)` |
+| `--dsh-peak-bar-offpeak` | "谷时"标签（取主题的成功色，即绿色） | `var(--dsw-alias-state-success-primary, var(--dsw-alias-label-secondary))` |
+| `--dsh-peak-bar-peak` | "高峰"标签 | `var(--dsw-alias-brand-primary)` |
+| `--dsh-peak-bar-countdown` | 倒计时数字 | `var(--dsw-alias-label-tertiary)` |
+| `--dsh-peak-bar-label` | “余额 / 今日已用”标签 | `var(--dsw-alias-label-tertiary)` |
+| `--dsh-peak-bar-spent` | 今日已用金额 | `var(--dsw-alias-label-secondary)` |
+| `--dsh-peak-bar-note` | 失败原因文字 | `var(--dsw-alias-label-tertiary)` |
+| `--dsh-peak-bar-radius` | 圆角 | `999px` |
+| `--dsh-peak-bar-font-size` | 字号 | `12px` |
 
 ### 皮肤作者接入
 
@@ -106,14 +106,14 @@ Host 路由不可用时（例如没有 HTTP 载体的 profile），胶囊退回"
 /* 你的 skin.css */
 :root {
   /* 底色跟着标题栏那条带子走，而不是用一个泛化的浮起色 */
-  --dsh-rhine-bg: var(--dsw-specific-sidebar-fill, transparent);
-  --dsh-rhine-border: var(--dsw-alias-border-l3);
+  --dsh-peak-bar-bg: var(--dsw-specific-sidebar-fill, transparent);
+  --dsh-peak-bar-border: var(--dsw-alias-border-l3);
   /* 直角皮肤：胶囊也切成直角。圆角档位不是每个皮肤都定义，
      所以给一个字面量兜底 —— 只写 var(--dsw-radius-sm) 的话，
      皮肤没定义这个 token 时整条声明会变成非法值而失效。 */
-  --dsh-rhine-radius: var(--dsw-radius-sm, 4px);
+  --dsh-peak-bar-radius: var(--dsw-radius-sm, 4px);
   /* 强调色仍是皮肤的品牌色，只是换个 token */
-  --dsh-rhine-peak: var(--dsw-alias-brand-primary);
+  --dsh-peak-bar-peak: var(--dsw-alias-brand-primary);
 }
 ```
 
@@ -123,10 +123,10 @@ Host 路由不可用时（例如没有 HTTP 载体的 profile），胶囊退回"
 
 ```css
 :root {
-  --dsh-rhine-bg: #2a1a10cc;
-  --dsh-rhine-border: #ff8a3d55;
-  --dsh-rhine-peak: #ff9d4d;
-  --dsh-rhine-text: #ffe9d2;
+  --dsh-peak-bar-bg: #2a1a10cc;
+  --dsh-peak-bar-border: #ff8a3d55;
+  --dsh-peak-bar-peak: #ff9d4d;
+  --dsh-peak-bar-text: #ffe9d2;
 }
 ```
 
@@ -134,10 +134,10 @@ Host 路由不可用时（例如没有 HTTP 载体的 profile），胶囊退回"
 
 ```css
 :root {
-  --dsh-rhine-bg: #101010;
-  --dsh-rhine-border: #ffffff;
-  --dsh-rhine-text: #ffffff;
-  --dsh-rhine-radius: 6px;
+  --dsh-peak-bar-bg: #101010;
+  --dsh-peak-bar-border: #ffffff;
+  --dsh-peak-bar-text: #ffffff;
+  --dsh-peak-bar-radius: 6px;
 }
 ```
 
@@ -145,10 +145,10 @@ Host 路由不可用时（例如没有 HTTP 载体的 profile），胶囊退回"
 
 ```css
 :root {
-  --dsh-rhine-bg: #06222a;
-  --dsh-rhine-border: #1de9b644;
-  --dsh-rhine-peak: #35e0d0;
-  --dsh-rhine-countdown: #7fd7d0;
+  --dsh-peak-bar-bg: #06222a;
+  --dsh-peak-bar-border: #1de9b644;
+  --dsh-peak-bar-peak: #35e0d0;
+  --dsh-peak-bar-countdown: #7fd7d0;
 }
 ```
 
@@ -173,6 +173,16 @@ node tests/host.test.mjs
 - `tests/peak.test.mjs`：峰谷规则，7 项。
 - `tests/render.test.mjs`：渲染、注入、主题默认值、点击、Host 账本往返；离线跑，用替身 React 与替身模块加载器，不碰真实 vault。
 - `tests/host.test.mjs`：Host 账本（记法、校验、信任栅栏、损坏文件）；用临时 `DSH_HOME`，不碰真实 `~/.dsh`。
+
+## 致谢
+
+这个插件的做法直接受益于以下项目与实现：
+
+- **[dsh-whale-widget](https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget)**（MeteorNOX）——“Host 持有凭据与账本、客户端只负责显示”这套分工，以及“今日已用 = 余额下降观测累计”的记账口径，都参照了它的做法；API key 余额这条路的思路也来自它。
+- **[dsh-plugin-rhine-lab-theme](https://github.com/Galaxy-2001/Rhine-Lab-Codex-Theme)**（Galaxy-2001）——本插件就是在该皮肤下开发与验证的，“跟随皮肤”的判据（语义 token 与深浅两套值）以它定义的为准。
+- **DSH 自带的“账号与余额”设置卡片**（`@deepseek-ai/dsh-client-ui-settings-account`）——余额的读取路径、返回结构（外层 `{ok, value}`、内层 `{status, value, bonusWallets}`），以及“`remote.account` 是独立于 `remote` 的服务名”这一点，都是从它的客户端产物里核对出来的。
+
+本插件不打包任何第三方代码或美术素材：`icon.svg` 为本项目自有。
 
 ## 许可
 

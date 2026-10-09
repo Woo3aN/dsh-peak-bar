@@ -1,5 +1,5 @@
 /**
- * Client half of dsh-rhine-statusbar — one compact capsule centred in the
+ * Client half of dsh-peak-bar — one compact capsule centred in the
  * window's caption strip, showing the DeepSeek API billing window (peak /
  * valley) with a countdown to the next switch, and the account balance.
  *
@@ -43,18 +43,18 @@
  * active skin — with the Rhine Lab skin that is the warm grey / orange palette
  * — and follows light and dark mode without any own colour literals.
  *
- * @module dsh-rhine-statusbar/client
+ * @module dsh-peak-bar/client
  */
 window.__ModuleLoader__.load({
-  id: 'dsh-rhine-statusbar',
+  id: 'dsh-peak-bar',
   factory(require) {
     const React = require('react')
     const h = React.createElement
 
     /** Panel id, shared by the capsule and the layout's keyed `main` seat. */
-    const PANEL_ID = 'rhine-statusbar'
+    const PANEL_ID = 'peak-bar'
     /** Locale namespace for the capsule: visible text goes through ctx.locale. */
-    const LOCALE_NS = 'statusbarRhine'
+    const LOCALE_NS = 'peakBar'
     /** Balance re-read interval; the account read itself is cached for 25s. */
     const BALANCE_REFRESH_MS = 60000
     /** One-second clock is enough: the capsule shows mm:ss. */
@@ -252,16 +252,16 @@ window.__ModuleLoader__.load({
      * not a bill, so spend is inferred from balance drops, and a ledger kept in
      * the page would restart with every window, every reload and every Desktop
      * launch (its port — and with it the page origin, and `localStorage` — can
-     * change per launch). The Host writes `<DSH_HOME>/.dsh-rhine-statusbar.json`
+     * change per launch). The Host writes `<DSH_HOME>/.dsh-peak-bar.json`
      * instead, so the number survives all three.
      */
-    const SPEND_ROUTE = '/dsh-rhine-statusbar/spend'
+    const SPEND_ROUTE = '/dsh-peak-bar/spend'
     /**
      * The Host's API-key balance route. The credential can only be resolved on
      * the Host, so a user who configured `DEEPSEEK_API_KEY` without signing in is
      * served from here rather than from the account Remote.
      */
-    const BALANCE_ROUTE = '/dsh-rhine-statusbar/balance'
+    const BALANCE_ROUTE = '/dsh-peak-bar/balance'
     /** A local request that outlives this is not coming back; fall back to local. */
     const SPEND_TIMEOUT_MS = 4000
 
@@ -308,7 +308,7 @@ window.__ModuleLoader__.load({
      * run's own tally in `localStorage`, so the number still moves; losing that
      * store costs history, never correctness.
      */
-    const SPEND_STORE_KEY = 'dsh-rhine-statusbar.spend'
+    const SPEND_STORE_KEY = 'dsh-peak-bar.spend'
     let spendRecord = null
 
     /** The run's spend record, read from storage once per run. */
@@ -632,23 +632,23 @@ window.__ModuleLoader__.load({
       const source = spendSourceText(props, status.spentSource)
       const balanceSource = balanceSourceText(props, status.balanceSource)
       const tableStale = isHolidayTableStale()
-      return h('div', { className: 'dshRhineStatusPanel' },
-        h('div', { className: 'dshRhineStatusPanel__head' },
-          h('span', { className: status.valley ? 'dshRhineStatusPanel__tag' : 'dshRhineStatusPanel__tag dshRhineStatusPanel__tag--peak' }, status.label),
-          h('span', { className: 'dshRhineStatusPanel__title' }, props.titleLabel)),
-        h('dl', { className: 'dshRhineStatusPanel__rows' },
+      return h('div', { className: 'dshPeakBarPanel' },
+        h('div', { className: 'dshPeakBarPanel__head' },
+          h('span', { className: status.valley ? 'dshPeakBarPanel__tag' : 'dshPeakBarPanel__tag dshPeakBarPanel__tag--peak' }, status.label),
+          h('span', { className: 'dshPeakBarPanel__title' }, props.titleLabel)),
+        h('dl', { className: 'dshPeakBarPanel__rows' },
           h('dt', null, props.nextLabel),
           h('dd', null, status.remaining === '' ? '—' : status.remaining),
           h('dt', null, props.balanceLabel),
           h('dd', null, status.balanceText),
           h('dt', null, props.spentLabel),
           h('dd', null, status.spentText === '' ? '—' : status.spentText)),
-        balanceSource === '' ? null : h('p', { className: 'dshRhineStatusPanel__note' }, `${props.balanceSourceLabel}：${balanceSource}`),
-        source === '' ? null : h('p', { className: 'dshRhineStatusPanel__note' }, `${props.spendSourceLabel}：${source}`),
-        tableStale ? h('p', { className: 'dshRhineStatusPanel__warn' }, props.holidayStaleHint) : null,
-        status.balanceNote === '' ? null : h('p', { className: 'dshRhineStatusPanel__warn' }, status.balanceNote),
-        h('p', { className: 'dshRhineStatusPanel__note' }, props.spentHint),
-        h('p', { className: 'dshRhineStatusPanel__note' }, props.ruleLabel))
+        balanceSource === '' ? null : h('p', { className: 'dshPeakBarPanel__note' }, `${props.balanceSourceLabel}：${balanceSource}`),
+        source === '' ? null : h('p', { className: 'dshPeakBarPanel__note' }, `${props.spendSourceLabel}：${source}`),
+        tableStale ? h('p', { className: 'dshPeakBarPanel__warn' }, props.holidayStaleHint) : null,
+        status.balanceNote === '' ? null : h('p', { className: 'dshPeakBarPanel__warn' }, status.balanceNote),
+        h('p', { className: 'dshPeakBarPanel__note' }, props.spentHint),
+        h('p', { className: 'dshPeakBarPanel__note' }, props.ruleLabel))
     }
 
     /**
@@ -795,27 +795,27 @@ window.__ModuleLoader__.load({
         if (layout && typeof layout.selectPanel === 'function') layout.selectPanel(PANEL_ID)
       }
 
-      return h('div', { className: 'dshRhineStatusSeat' },
+      return h('div', { className: 'dshPeakBarSeat' },
         h('button', {
           type: 'button',
-          className: 'dshRhineStatusCapsule',
+          className: 'dshPeakBarCapsule',
           title,
           'aria-label': title,
           onClick: openPanel,
         },
-          h('span', { className: status.valley ? 'dshRhineStatusCapsule__tag' : 'dshRhineStatusCapsule__tag dshRhineStatusCapsule__tag--peak' }, status.label),
-          status.remaining === '' ? null : h('span', { className: 'dshRhineStatusCapsule__time' }, status.remaining),
+          h('span', { className: status.valley ? 'dshPeakBarCapsule__tag' : 'dshPeakBarCapsule__tag dshPeakBarCapsule__tag--peak' }, status.label),
+          status.remaining === '' ? null : h('span', { className: 'dshPeakBarCapsule__time' }, status.remaining),
           // The numbers are labelled, the way the balance widgets read: a bare
           // amount next to a countdown is ambiguous.
-          h('span', { className: 'dshRhineStatusCapsule__label' }, props.balanceLabel),
-          h('span', { className: 'dshRhineStatusCapsule__money' }, status.balanceText),
+          h('span', { className: 'dshPeakBarCapsule__label' }, props.balanceLabel),
+          h('span', { className: 'dshPeakBarCapsule__money' }, status.balanceText),
           // Today's observed spend, hidden until a first drop is seen.
-          status.spentText === '' ? null : h('span', { className: 'dshRhineStatusCapsule__label' }, props.spentLabel),
-          status.spentText === '' ? null : h('span', { className: 'dshRhineStatusCapsule__spent' }, status.spentText),
+          status.spentText === '' ? null : h('span', { className: 'dshPeakBarCapsule__label' }, props.spentLabel),
+          status.spentText === '' ? null : h('span', { className: 'dshPeakBarCapsule__spent' }, status.spentText),
           // The reason is rendered inline, not only in the tooltip: a lone `—`
           // cannot be told apart from "still loading", and the caption strip is
           // the only place the user is already looking.
-          status.balanceNote === '' ? null : h('span', { className: 'dshRhineStatusCapsule__note' }, status.balanceNote)))
+          status.balanceNote === '' ? null : h('span', { className: 'dshPeakBarCapsule__note' }, status.balanceNote)))
     }
 
     /**
@@ -836,7 +836,7 @@ window.__ModuleLoader__.load({
      * capsule loses its outline. Resolved on the element itself, the fallback sees
      * the body-scoped tokens.
      *
-     * Customising rides on top: no rule of ours declares `--dsh-rhine-*`, so any
+     * Customising rides on top: no rule of ours declares `--dsh-peak-bar-*`, so any
      * rule that does — in a skin's `skin.css`, in a custom stylesheet, on `:root`,
      * on `body`, or on the capsule — wins outright, with no specificity fight.
      *
@@ -849,34 +849,34 @@ window.__ModuleLoader__.load({
      * strip is reserved, the capsule floats a few pixels below the top edge.
      */
     const CAPSULE_CSS = [
-      '.dshRhineStatusSeat{position:absolute;top:0;left:50%;transform:translateX(-50%);',
+      '.dshPeakBarSeat{position:absolute;top:0;left:50%;transform:translateX(-50%);',
       'height:var(--dsh-windows-titlebar-height,var(--dsh-frame-top-clearance,48px));',
       'display:flex;align-items:center;justify-content:center;max-width:60%;',
       'pointer-events:none;-webkit-app-region:no-drag;z-index:1}',
-      'html[data-fullscreen] .dshRhineStatusSeat{top:6px;height:auto}',
-      '.dshRhineStatusCapsule{pointer-events:auto;-webkit-app-region:no-drag;',
+      'html[data-fullscreen] .dshPeakBarSeat{top:6px;height:auto}',
+      '.dshPeakBarCapsule{pointer-events:auto;-webkit-app-region:no-drag;',
       'display:inline-flex;align-items:center;gap:.4em;height:24px;padding:0 10px;',
       'box-sizing:border-box;',
-      'border:.5px solid var(--dsh-rhine-border,var(--dsw-alias-border-l2));',
-      'border-radius:var(--dsh-rhine-radius,999px);',
-      'background:var(--dsh-rhine-bg,var(--dsw-alias-button-elevated-fill,transparent));',
-      'color:var(--dsh-rhine-text,var(--dsw-alias-label-primary));',
-      'font:inherit;font-size:var(--dsh-rhine-font-size,12px);line-height:1;',
+      'border:.5px solid var(--dsh-peak-bar-border,var(--dsw-alias-border-l2));',
+      'border-radius:var(--dsh-peak-bar-radius,999px);',
+      'background:var(--dsh-peak-bar-bg,var(--dsw-alias-button-elevated-fill,transparent));',
+      'color:var(--dsh-peak-bar-text,var(--dsw-alias-label-primary));',
+      'font:inherit;font-size:var(--dsh-peak-bar-font-size,12px);line-height:1;',
       'cursor:pointer;white-space:nowrap;overflow:hidden;',
       'transition:background-color var(--ds-transition-duration,.12s) var(--ds-ease-in-out,ease)}',
-      '.dshRhineStatusCapsule:hover{background:var(--dsh-rhine-bg-hover,var(--dsw-alias-button-floating-hover))}',
-      '.dshRhineStatusCapsule:focus-visible{outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:-1px}',
+      '.dshPeakBarCapsule:hover{background:var(--dsh-peak-bar-bg-hover,var(--dsw-alias-button-floating-hover))}',
+      '.dshPeakBarCapsule:focus-visible{outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:-1px}',
       // Off-peak reads as the good state, so it takes the theme's success colour
       // (a skin that defines none keeps the neutral secondary label).
-      '.dshRhineStatusCapsule__tag{flex:none;font-weight:600;color:var(--dsh-rhine-offpeak,var(--dsw-alias-state-success-primary,var(--dsw-alias-label-secondary)))}',
-      '.dshRhineStatusCapsule__tag--peak{color:var(--dsh-rhine-peak,var(--dsw-alias-brand-primary))}',
-      '.dshRhineStatusCapsule__time{flex:none;color:var(--dsh-rhine-countdown,var(--dsw-alias-label-tertiary));font-variant-numeric:tabular-nums}',
-      '.dshRhineStatusCapsule__label{flex:none;color:var(--dsh-rhine-label,var(--dsw-alias-label-tertiary))}',
-      '.dshRhineStatusCapsule__money{flex:none;color:var(--dsh-rhine-text,var(--dsw-alias-label-primary));font-variant-numeric:tabular-nums}',
-      '.dshRhineStatusCapsule__spent{flex:none;color:var(--dsh-rhine-spent,var(--dsw-alias-label-secondary));font-variant-numeric:tabular-nums}',
-      '.dshRhineStatusCapsule__note{flex:none;min-width:0;max-width:20em;overflow:hidden;text-overflow:ellipsis;',
-      'white-space:nowrap;color:var(--dsh-rhine-note,var(--dsw-alias-label-tertiary));font-size:.92em}',
-      '@media (prefers-reduced-motion:reduce){.dshRhineStatusCapsule{transition:none}}',
+      '.dshPeakBarCapsule__tag{flex:none;font-weight:600;color:var(--dsh-peak-bar-offpeak,var(--dsw-alias-state-success-primary,var(--dsw-alias-label-secondary)))}',
+      '.dshPeakBarCapsule__tag--peak{color:var(--dsh-peak-bar-peak,var(--dsw-alias-brand-primary))}',
+      '.dshPeakBarCapsule__time{flex:none;color:var(--dsh-peak-bar-countdown,var(--dsw-alias-label-tertiary));font-variant-numeric:tabular-nums}',
+      '.dshPeakBarCapsule__label{flex:none;color:var(--dsh-peak-bar-label,var(--dsw-alias-label-tertiary))}',
+      '.dshPeakBarCapsule__money{flex:none;color:var(--dsh-peak-bar-text,var(--dsw-alias-label-primary));font-variant-numeric:tabular-nums}',
+      '.dshPeakBarCapsule__spent{flex:none;color:var(--dsh-peak-bar-spent,var(--dsw-alias-label-secondary));font-variant-numeric:tabular-nums}',
+      '.dshPeakBarCapsule__note{flex:none;min-width:0;max-width:20em;overflow:hidden;text-overflow:ellipsis;',
+      'white-space:nowrap;color:var(--dsh-peak-bar-note,var(--dsw-alias-label-tertiary));font-size:.92em}',
+      '@media (prefers-reduced-motion:reduce){.dshPeakBarCapsule{transition:none}}',
     ].join('')
 
     /**
@@ -884,16 +884,16 @@ window.__ModuleLoader__.load({
      * and no own typography — the panel inherits the host's body text.
      */
     const PANEL_CSS = [
-      '.dshRhineStatusPanel{padding:18px 20px;max-width:520px;color:var(--dsw-alias-label-primary)}',
-      '.dshRhineStatusPanel__head{display:flex;align-items:baseline;gap:8px;margin-bottom:12px}',
-      '.dshRhineStatusPanel__tag{font-weight:600;color:var(--dsh-rhine-offpeak,var(--dsw-alias-state-success-primary,var(--dsw-alias-label-secondary)))}',
-      '.dshRhineStatusPanel__tag--peak{color:var(--dsh-rhine-peak,var(--dsw-alias-brand-primary))}',
-      '.dshRhineStatusPanel__title{color:var(--dsw-alias-label-tertiary)}',
-      '.dshRhineStatusPanel__rows{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0}',
-      '.dshRhineStatusPanel__rows dt{color:var(--dsw-alias-label-secondary)}',
-      '.dshRhineStatusPanel__rows dd{margin:0;font-variant-numeric:tabular-nums}',
-      '.dshRhineStatusPanel__note{margin:14px 0 0;color:var(--dsw-alias-label-tertiary);line-height:1.6}',
-      '.dshRhineStatusPanel__warn{margin:14px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6}',
+      '.dshPeakBarPanel{padding:18px 20px;max-width:520px;color:var(--dsw-alias-label-primary)}',
+      '.dshPeakBarPanel__head{display:flex;align-items:baseline;gap:8px;margin-bottom:12px}',
+      '.dshPeakBarPanel__tag{font-weight:600;color:var(--dsh-peak-bar-offpeak,var(--dsw-alias-state-success-primary,var(--dsw-alias-label-secondary)))}',
+      '.dshPeakBarPanel__tag--peak{color:var(--dsh-peak-bar-peak,var(--dsw-alias-brand-primary))}',
+      '.dshPeakBarPanel__title{color:var(--dsw-alias-label-tertiary)}',
+      '.dshPeakBarPanel__rows{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0}',
+      '.dshPeakBarPanel__rows dt{color:var(--dsw-alias-label-secondary)}',
+      '.dshPeakBarPanel__rows dd{margin:0;font-variant-numeric:tabular-nums}',
+      '.dshPeakBarPanel__note{margin:14px 0 0;color:var(--dsw-alias-label-tertiary);line-height:1.6}',
+      '.dshPeakBarPanel__warn{margin:14px 0 0;color:var(--dsw-alias-label-secondary);line-height:1.6}',
     ].join('')
 
     const locale = {
@@ -963,7 +963,7 @@ window.__ModuleLoader__.load({
      * @returns a disposer that removes the tag it created.
      */
     function installStyles(doc) {
-      const marker = 'data-dsh-rhine-statusbar'
+      const marker = 'data-dsh-peak-bar'
       if (doc.head.querySelector(`style[${marker}]`) !== null) return () => {}
       const tag = doc.createElement('style')
       tag.setAttribute(marker, '')
@@ -998,8 +998,8 @@ window.__ModuleLoader__.load({
     function registerFailureCapsule(ctx, error) {
       const english = activeLocale(ctx).toLowerCase().startsWith('en')
       const message = fill(FAILURE_LINES[english ? 'en' : 'zh'], { detail: errText(error) })
-      const Failure = () => h('div', { className: 'dshRhineStatusSeat' },
-        h('span', { className: 'dshRhineStatusCapsule', title: message }, message))
+      const Failure = () => h('div', { className: 'dshPeakBarSeat' },
+        h('span', { className: 'dshPeakBarCapsule', title: message }, message))
       ctx.slots.inject('shell.overlay', () => ctx.slots.register({
         name: 'shell.overlay',
         id: `${PANEL_ID}-failure`,
@@ -1018,12 +1018,12 @@ window.__ModuleLoader__.load({
         applyWorking(ctx)
       } catch (error) {
         try {
-          ctx.effect(() => installStyles(document), 'rhine-statusbar: stylesheet (failure path)')
+          ctx.effect(() => installStyles(document), 'peak-bar: stylesheet (failure path)')
           registerFailureCapsule(ctx, error)
         } catch (secondary) {
           // Nothing left to draw with; the Host console carries the original.
           if (typeof console !== 'undefined' && typeof console.error === 'function') {
-            console.error('[dsh-rhine-statusbar]', error, secondary)
+            console.error('[dsh-peak-bar]', error, secondary)
           }
         }
       }
@@ -1055,7 +1055,7 @@ window.__ModuleLoader__.load({
             return () => {
               accountScope = null
             }
-          }, 'rhine-statusbar: account scope')
+          }, 'peak-bar: account scope')
         })
       }
 
@@ -1091,8 +1091,8 @@ window.__ModuleLoader__.load({
         },
       })
 
-      ctx.effect(() => ctx.locale.register(LOCALE_NS, locale), 'rhine-statusbar: dictionaries')
-      ctx.effect(() => installStyles(document), 'rhine-statusbar: stylesheet')
+      ctx.effect(() => ctx.locale.register(LOCALE_NS, locale), 'peak-bar: dictionaries')
+      ctx.effect(() => installStyles(document), 'peak-bar: stylesheet')
 
       // The panel body registers first: opening the capsule selects its `main`
       // key, and the layout refuses a key with no registration.

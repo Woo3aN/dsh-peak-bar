@@ -1,7 +1,7 @@
 {
-  "name": "dsh-rhine-statusbar",
+  "name": "dsh-peak-bar",
   "version": "0.3.0",
-  "description": "莱茵生命配色：窗口标题栏居中一枚胶囊，显示 DeepSeek API 峰谷时段与账户余额，点击展开详情。",
+  "description": "窗口标题栏居中的一枚小胶囊：DeepSeek API 峰谷时段、账户余额与今日已用；颜色跟随当前皮肤。",
   "keywords": [
     "dsh",
     "dsh-plugin",
@@ -9,8 +9,9 @@
     "balance",
     "peak",
     "off-peak",
-    "statusbar",
-    "titlebar"
+    "countdown",
+    "titlebar",
+    "caption"
   ],
   "author": "Woo3aN",
   "license": "MIT",

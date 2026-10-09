@@ -1,4 +1,4 @@
-# dsh-rhine-statusbar
+# dsh-peak-bar
 
 One small capsule centred in the window title bar: it shows the DeepSeek API peak/off-peak billing windows and the account balance. Click the capsule to open a details panel in the main area; when the read fails, the capsule writes the reason on itself.
 
@@ -57,7 +57,7 @@ Then reload.
 The balance has **two paths**, tried in order:
 
 1. **Account sign-in**: `ctx.remote.account.getBalance()` — the same path as the account and balance settings card DSH ships with. The answer has two layers: `{ok, value}`, where `value` is `{status, value: top-up wallets[], bonusWallets: bonus wallets[]}`. Balance = top-up + bonus; multiple currencies are shown separately and joined with ` + `.
-2. **API key**: when the account path cannot answer (not signed in, expired sign-in, account service not ready), the page asks the Host half at `/dsh-rhine-statusbar/balance`. The Host resolves `DEEPSEEK_API_KEY` from the DSH credential service, calls the official `GET https://api.deepseek.com/user/balance`, and returns only `total_balance` and its currency. **The key never leaves the Host, and nothing is sent anywhere except the official endpoint.**
+2. **API key**: when the account path cannot answer (not signed in, expired sign-in, account service not ready), the page asks the Host half at `/dsh-peak-bar/balance`. The Host resolves `DEEPSEEK_API_KEY` from the DSH credential service, calls the official `GET https://api.deepseek.com/user/balance`, and returns only `total_balance` and its currency. **The key never leaves the Host, and nothing is sent anywhere except the official endpoint.**
 
 Both paths report the same quantity (top-up plus granted credit), so the spend ledger keeps folding correctly when the source switches. The panel names which path answered (`balance source: DeepSeek account sign-in / API key`).
 
@@ -67,7 +67,7 @@ Nothing is sent to a third party; the account balance goes through DSH's own acc
 
 The account API reports a **balance**, not a bill, so "spent today" is inferred from **balance drops**: the difference between two readings that went down counts as consumption, while a rise (a top-up or granted credit) is not counted and never cancels spend already recorded. Days are split on the Beijing calendar, matching the official billing day.
 
-The ledger is written by the **Host half** to `<DSH_HOME>/.dsh-rhine-statusbar.json` (default `~/.dsh/`). It lives in the Host rather than the page because a Desktop launch can pick a different port — a different port means a different page origin, and `localStorage` would be wiped with it. The file keeps the last 14 days of daily totals, is written atomically (temp file plus rename), and a corrupted file is treated as an empty ledger instead of breaking the plugin.
+The ledger is written by the **Host half** to `<DSH_HOME>/.dsh-peak-bar.json` (default `~/.dsh/`). It lives in the Host rather than the page because a Desktop launch can pick a different port — a different port means a different page origin, and `localStorage` would be wiped with it. The file keeps the last 14 days of daily totals, is written atomically (temp file plus rename), and a corrupted file is treated as an empty ledger instead of breaking the plugin.
 
 When the Host route is unavailable — a profile with no HTTP carrier, for instance — the capsule falls back to counting this run only, and keeps showing the peak window and balance as usual: what is lost is history, not the feature.
 
@@ -81,22 +81,22 @@ Customising is a layer on top, not a replacement: override a few variables and t
 
 ## Custom colours
 
-The plugin declares none of the `--dsh-rhine-*` variables itself; it only reads them at the point of use, as `var(--dsh-rhine-x, <theme token>)`. That is deliberate: the theme projects `--dsw-alias-*` inline on **`body`**, so a `--dsh-rhine-x` declared on `html` would be resolved on an element where those tokens do not exist yet and would come out invalid — a property without a fallback, such as `border`, then disappears outright, which is exactly how an earlier build lost its outline. Read on the element itself, the fallback sees the body-scoped tokens. Declaring nothing also means **any override applies as-is**: your skin's `skin.css`, a custom stylesheet, `:root`, `body`, or the capsule element itself — no specificity contest with this file.
+The plugin declares none of the `--dsh-peak-bar-*` variables itself; it only reads them at the point of use, as `var(--dsh-peak-bar-x, <theme token>)`. That is deliberate: the theme projects `--dsw-alias-*` inline on **`body`**, so a `--dsh-peak-bar-x` declared on `html` would be resolved on an element where those tokens do not exist yet and would come out invalid — a property without a fallback, such as `border`, then disappears outright, which is exactly how an earlier build lost its outline. Read on the element itself, the fallback sees the body-scoped tokens. Declaring nothing also means **any override applies as-is**: your skin's `skin.css`, a custom stylesheet, `:root`, `body`, or the capsule element itself — no specificity contest with this file.
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `--dsh-rhine-bg` | capsule background | `var(--dsw-alias-button-elevated-fill, transparent)` |
-| `--dsh-rhine-bg-hover` | hover background | `var(--dsw-alias-button-floating-hover)` |
-| `--dsh-rhine-border` | border | `var(--dsw-alias-border-l2)` |
-| `--dsh-rhine-text` | primary text (amounts) | `var(--dsw-alias-label-primary)` |
-| `--dsh-rhine-offpeak` | the "谷时" tag (the theme's success colour, i.e. green) | `var(--dsw-alias-state-success-primary, var(--dsw-alias-label-secondary))` |
-| `--dsh-rhine-peak` | "高峰" tag | `var(--dsw-alias-brand-primary)` |
-| `--dsh-rhine-countdown` | countdown digits | `var(--dsw-alias-label-tertiary)` |
-| `--dsh-rhine-label` | the "余额 / 今日已用" labels | `var(--dsw-alias-label-tertiary)` |
-| `--dsh-rhine-spent` | today's spend amount | `var(--dsw-alias-label-secondary)` |
-| `--dsh-rhine-note` | failure reason text | `var(--dsw-alias-label-tertiary)` |
-| `--dsh-rhine-radius` | corner radius | `999px` |
-| `--dsh-rhine-font-size` | font size | `12px` |
+| `--dsh-peak-bar-bg` | capsule background | `var(--dsw-alias-button-elevated-fill, transparent)` |
+| `--dsh-peak-bar-bg-hover` | hover background | `var(--dsw-alias-button-floating-hover)` |
+| `--dsh-peak-bar-border` | border | `var(--dsw-alias-border-l2)` |
+| `--dsh-peak-bar-text` | primary text (amounts) | `var(--dsw-alias-label-primary)` |
+| `--dsh-peak-bar-offpeak` | the "谷时" tag (the theme's success colour, i.e. green) | `var(--dsw-alias-state-success-primary, var(--dsw-alias-label-secondary))` |
+| `--dsh-peak-bar-peak` | "高峰" tag | `var(--dsw-alias-brand-primary)` |
+| `--dsh-peak-bar-countdown` | countdown digits | `var(--dsw-alias-label-tertiary)` |
+| `--dsh-peak-bar-label` | the "余额 / 今日已用" labels | `var(--dsw-alias-label-tertiary)` |
+| `--dsh-peak-bar-spent` | today's spend amount | `var(--dsw-alias-label-secondary)` |
+| `--dsh-peak-bar-note` | failure reason text | `var(--dsw-alias-label-tertiary)` |
+| `--dsh-peak-bar-radius` | corner radius | `999px` |
+| `--dsh-peak-bar-font-size` | font size | `12px` |
 
 ### For skin authors
 
@@ -106,14 +106,14 @@ A skin that wants to own the capsule only overrides the differences — this one
 /* your skin.css */
 :root {
   /* take the caption strip's own fill instead of a generic elevated surface */
-  --dsh-rhine-bg: var(--dsw-specific-sidebar-fill, transparent);
-  --dsh-rhine-border: var(--dsw-alias-border-l3);
+  --dsh-peak-bar-bg: var(--dsw-specific-sidebar-fill, transparent);
+  --dsh-peak-bar-border: var(--dsw-alias-border-l3);
   /* a square-cornered skin squares the capsule too. Not every skin defines a
      radius step, so keep a literal fallback: a bare var(--dsw-radius-sm)
      resolves to nothing there and the whole declaration is dropped. */
-  --dsh-rhine-radius: var(--dsw-radius-sm, 4px);
+  --dsh-peak-bar-radius: var(--dsw-radius-sm, 4px);
   /* the accent is still the skin's brand colour, just re-pointed */
-  --dsh-rhine-peak: var(--dsw-alias-brand-primary);
+  --dsh-peak-bar-peak: var(--dsw-alias-brand-primary);
 }
 ```
 
@@ -123,10 +123,10 @@ Anything you leave out keeps following the skin. **Always give a skin token a li
 
 ```css
 :root {
-  --dsh-rhine-bg: #2a1a10cc;
-  --dsh-rhine-border: #ff8a3d55;
-  --dsh-rhine-peak: #ff9d4d;
-  --dsh-rhine-text: #ffe9d2;
+  --dsh-peak-bar-bg: #2a1a10cc;
+  --dsh-peak-bar-border: #ff8a3d55;
+  --dsh-peak-bar-peak: #ff9d4d;
+  --dsh-peak-bar-text: #ffe9d2;
 }
 ```
 
@@ -134,10 +134,10 @@ Anything you leave out keeps following the skin. **Always give a skin token a li
 
 ```css
 :root {
-  --dsh-rhine-bg: #101010;
-  --dsh-rhine-border: #ffffff;
-  --dsh-rhine-text: #ffffff;
-  --dsh-rhine-radius: 6px;
+  --dsh-peak-bar-bg: #101010;
+  --dsh-peak-bar-border: #ffffff;
+  --dsh-peak-bar-text: #ffffff;
+  --dsh-peak-bar-radius: 6px;
 }
 ```
 
@@ -145,10 +145,10 @@ Anything you leave out keeps following the skin. **Always give a skin token a li
 
 ```css
 :root {
-  --dsh-rhine-bg: #06222a;
-  --dsh-rhine-border: #1de9b644;
-  --dsh-rhine-peak: #35e0d0;
-  --dsh-rhine-countdown: #7fd7d0;
+  --dsh-peak-bar-bg: #06222a;
+  --dsh-peak-bar-border: #1de9b644;
+  --dsh-peak-bar-peak: #35e0d0;
+  --dsh-peak-bar-countdown: #7fd7d0;
 }
 ```
 
@@ -173,6 +173,16 @@ node tests/host.test.mjs
 - `tests/peak.test.mjs`: peak/off-peak rules, 7 cases.
 - `tests/render.test.mjs`: rendering, injection, theme defaults, clicks, and the Host ledger round trip; runs offline with a stand-in React and a stand-in module loader, and never touches the real vault.
 - `tests/host.test.mjs`: the Host ledger (accounting rule, validation, trust fence, corrupted file); uses a temporary `DSH_HOME` and never touches the real `~/.dsh`.
+
+## Acknowledgements
+
+This plugin's approach owes a direct debt to the following projects and implementations:
+
+- **[dsh-whale-widget](https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget)** (MeteorNOX) — the split where the Host owns the credentials and the ledger while the client only displays, and the accounting rule behind "spent today" (accumulating observed balance drops), both follow its approach; so does the idea of a separate API-key balance path.
+- **[dsh-plugin-rhine-lab-theme](https://github.com/Galaxy-2001/Rhine-Lab-Codex-Theme)** (Galaxy-2001) — this plugin was developed and verified under that skin, and "follows the skin" is measured against the semantic tokens and light/dark pairs it defines.
+- **DSH's own account and balance settings card** (`@deepseek-ai/dsh-client-ui-settings-account`) — the balance read path, its two-layer answer (`{ok, value}` wrapping `{status, value, bonusWallets}`), and the fact that `remote.account` is a service of its own next to `remote`, were all confirmed against that client artifact.
+
+The plugin bundles no third-party code or artwork: `icon.svg` belongs to this project.
 
 ## License
 

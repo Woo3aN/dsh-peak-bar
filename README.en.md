@@ -12,6 +12,10 @@ One small capsule centred in the window title bar: it shows the DeepSeek API pea
 
 The capsule shows whether the current window is peak or off-peak, the countdown to the next switch, and the account balance; the countdown is accurate to the second. Clicking the capsule opens a details panel in the main area with the peak/off-peak state, the countdown to the next switch, the balance, and an explanation of the billing rules; **the ✕ in its top-right corner returns to the conversation**.
 
+![The details panel: the billing window, the countdown, the balance and today's spend, plus both sources and the billing rule](docs/panel.png)
+
+> Both images are real captures; **the amounts and the countdown in them are illustrative** (the real balance and spend were replaced), everything else is untouched.
+
 A failed read is never silent:
 
 - **Before any value has ever been read**, the capsule says “balance read failed” — a bare `--` needs its explanation.
